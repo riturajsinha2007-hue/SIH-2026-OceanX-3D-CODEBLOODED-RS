@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #101010;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #262626;
+    border-radius: 9999px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #404040;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #080808;
+  color: #F5F5F5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Cesium Widget Adjustments */
+.cesium-widget,
+.cesium-widget canvas {
+  width: 100% !important;
+  height: 100% !important;
+  touch-action: none;
+}
+
+.cesium-widget-credits {
+  font-size: 9px !important;
+  opacity: 0.3;
+  bottom: 2px !important;
+  right: 180px !important;
+  pointer-events: none;
+}

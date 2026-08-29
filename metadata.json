@@ -1,0 +1,6 @@
+{
+  "name": "OceanX 3D",
+  "description": "Scientific ocean visualization and analysis platform integrating INCOIS numerical model fields with real in-situ observations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
