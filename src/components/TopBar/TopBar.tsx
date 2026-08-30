@@ -47,7 +47,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
         </div>
 
-        {/* Navigation Tabs (Explore, Compare, Datasets, AI Copilot, About) */}
+        {/* Navigation Tabs (Explore, Compare, Datasets, About) */}
         <nav className="hidden lg:flex items-center gap-1 text-xs">
           <button
             className="px-3 py-1.5 font-medium text-[#F5F5F5] border-b-2 border-[#F5C518] transition-colors cursor-pointer"
@@ -65,12 +65,6 @@ export const TopBar: React.FC<TopBarProps> = ({
             className="px-3 py-1.5 text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors cursor-pointer"
           >
             Datasets
-          </button>
-          <button
-            onClick={onOpenInfo}
-            className="px-3 py-1.5 text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors cursor-pointer"
-          >
-            AI Copilot
           </button>
           <button
             onClick={onOpenInfo}
@@ -98,7 +92,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         </div>
       </div>
 
-      {/* Right: Actions, Modals & User */}
+      {/* Right: Actions & Modals */}
       <div className="flex items-center gap-2">
         {onToggleDebug && (
           <button
@@ -134,21 +128,6 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           <HelpCircle className="w-4 h-4" />
         </button>
-
-        <button
-          onClick={onOpenInfo}
-          className="p-1.5 rounded-md text-[#A3A3A3] hover:text-[#F5F5F5] hover:bg-[#161616] border border-transparent hover:border-[#262626] transition-colors cursor-pointer"
-          title="System Notifications"
-        >
-          <Bell className="w-4 h-4" />
-        </button>
-
-        <div
-          className="w-7 h-7 rounded-full bg-[#161616] border border-[#262626] flex items-center justify-center text-[10px] font-semibold text-[#F5F5F5] select-none"
-          title="Active Operator Session"
-        >
-          OU
-        </div>
       </div>
     </header>
   );

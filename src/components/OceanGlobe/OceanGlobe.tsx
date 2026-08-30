@@ -150,9 +150,12 @@ export const OceanGlobe: React.FC<OceanGlobeProps> = ({
     }));
 
     const datasetId = variable === 'CHLA' ? 'incois_oceansat2_datasets' : 'incois_argo_mnt_VAM';
-    const bounds = variable === 'CHLA'
-      ? { latMin: 0.5, latMax: 27.5, lonMin: 47.0, lonMax: 99.0 }
-      : { latMin: GRID_METADATA.latMin, latMax: GRID_METADATA.latMax, lonMin: GRID_METADATA.lonMin, lonMax: GRID_METADATA.lonMax };
+    const bounds = {
+      latMin: GRID_METADATA.latMin,
+      latMax: GRID_METADATA.latMax,
+      lonMin: GRID_METADATA.lonMin,
+      lonMax: GRID_METADATA.lonMax,
+    };
 
     const currentSelection: DataSelection = {
       datasetId,
