@@ -48,6 +48,57 @@ function hexToRgb(hex: string): [number, number, number] {
   return [r, g, b];
 }
 
+// Pre-computed Look-Up Tables (LUTs) for high-performance 60fps raster generation
+const LUT_CACHE = new Map<string, Uint8ClampedArray>();
+
+export function getColormapLUT(colormap: ColormapType, opacity: number = 0.85): Uint8ClampedArray {
+  const cacheKey = `${colormap}_${opacity.toFixed(2)}`;
+  const existing = LUT_CACHE.get(cacheKey);
+  if (existing) return existing;
+
+  const lut = new Uint8ClampedArray(1024 * 4);
+  let stops = incoisRainbowStops;
+  if (colormap === 'incois_rainbow') stops = incoisRainbowStops;
+  else if (colormap === 'thermal') stops = thermalStops;
+  else if (colormap === 'halite') stops = haliteStops;
+
+  const a = Math.round(opacity * 255);
+
+  for (let step = 0; step < 1024; step++) {
+    const normalized = step / 1023.0;
+
+    let lower = stops[0];
+    let upper = stops[stops.length - 1];
+
+    for (let i = 0; i < stops.length - 1; i++) {
+      if (normalized >= stops[i][0] && normalized <= stops[i + 1][0]) {
+        lower = stops[i];
+        upper = stops[i + 1];
+        break;
+      }
+    }
+
+    const segmentRange = upper[0] - lower[0] || 0.0001;
+    const factor = (normalized - lower[0]) / segmentRange;
+
+    const [r1, g1, b1] = hexToRgb(lower[1]);
+    const [r2, g2, b2] = hexToRgb(upper[1]);
+
+    const r = Math.round(r1 + (r2 - r1) * factor);
+    const g = Math.round(g1 + (g2 - g1) * factor);
+    const b = Math.round(b1 + (b2 - b1) * factor);
+
+    const idx = step * 4;
+    lut[idx] = r;
+    lut[idx + 1] = g;
+    lut[idx + 2] = b;
+    lut[idx + 3] = a;
+  }
+
+  LUT_CACHE.set(cacheKey, lut);
+  return lut;
+}
+
 export function getColorForValue(
   val: number,
   minVal: number,

@@ -137,7 +137,7 @@ export const BottomTimeline: React.FC<BottomTimelineProps> = ({
   return (
     <div
       id="bottom-timeline"
-      className="relative z-20 w-full bg-[#101010] border-t border-[#262626] px-4 py-2 shadow-sm flex flex-col gap-1.5 select-none"
+      className="relative z-20 w-full shrink-0 bg-[#101010] border-t border-[#262626] px-4 py-2 shadow-sm flex flex-col gap-1.5 select-none"
     >
       {/* Top Row: Playback Controls + Quick Presets + Date Information */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">

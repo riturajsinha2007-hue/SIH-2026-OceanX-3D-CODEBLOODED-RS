@@ -19,6 +19,9 @@ import {
   Bug,
   Sliders,
   ExternalLink,
+  ChevronRight,
+  ChevronLeft,
+  Eye,
 } from 'lucide-react';
 
 interface RightAnalysisPanelProps {
@@ -217,13 +220,60 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  if (isCollapsed) {
+    return (
+      <div
+        id="right-analysis-panel-collapsed"
+        className="relative z-30 flex flex-col items-center justify-between h-full w-12 shrink-0 bg-[#101010] border-l border-[#262626] py-3 shadow-xl select-none text-[#A3A3A3]"
+      >
+        <div className="flex flex-col items-center gap-4">
+          <button
+            onClick={() => setIsCollapsed(false)}
+            className="p-2 rounded-md hover:bg-[#161616] text-[#A3A3A3] hover:text-[#F5C518] border border-transparent hover:border-[#262626] transition-colors cursor-pointer"
+            title="Expand Observation & Analysis Panel"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <div
+            className="text-[10px] font-semibold text-[#F5F5F5] uppercase tracking-wider -rotate-90 origin-center my-8 whitespace-nowrap cursor-pointer hover:text-[#F5C518] transition-colors"
+            onClick={() => setIsCollapsed(false)}
+          >
+            Analysis & Legend
+          </div>
+        </div>
+
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className="p-2 rounded-md hover:bg-[#161616] text-[#A3A3A3] hover:text-[#F5F5F5] border border-transparent hover:border-[#262626] transition-colors cursor-pointer"
+          title="Open Legend & Depth Profile"
+        >
+          <Activity className="w-4 h-4 text-[#F5C518]" />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       id="right-analysis-panel"
-      className="relative z-30 flex flex-col h-full w-80 md:w-88 bg-[#101010] border-l border-[#262626] shadow-xl overflow-y-auto custom-scrollbar select-none text-[#F5F5F5]"
+      className="relative z-30 flex flex-col h-full w-76 sm:w-80 lg:w-84 xl:w-88 shrink-0 bg-[#101010] border-l border-[#262626] shadow-xl overflow-y-auto custom-scrollbar select-none text-[#F5F5F5]"
     >
-      {/* 0. DOCKED ACTIVE VARIABLE & COLORBAR LEGEND */}
+      {/* 0. DOCKED ACTIVE VARIABLE & COLORBAR LEGEND WITH COLLAPSE TOGGLE */}
       <div className="p-3 pb-2 border-b border-[#262626] bg-[#101010] shrink-0">
+        <div className="flex items-center justify-between pb-1.5">
+          <span className="text-[10px] font-mono text-[#A3A3A3] uppercase tracking-wider">
+            Observation & Analysis
+          </span>
+          <button
+            onClick={() => setIsCollapsed(true)}
+            className="p-1 rounded hover:bg-[#161616] text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            title="Collapse Analysis Panel"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
         <ScientificLegend state={state} />
       </div>
 

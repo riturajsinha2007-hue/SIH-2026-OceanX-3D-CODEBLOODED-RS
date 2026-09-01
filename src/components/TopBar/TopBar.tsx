@@ -26,57 +26,57 @@ export const TopBar: React.FC<TopBarProps> = ({
   return (
     <header
       id="top-bar"
-      className="relative z-30 h-13 w-full bg-[#101010] border-b border-[#262626] px-4 flex items-center justify-between shadow-sm select-none"
+      className="relative z-30 h-13 w-full shrink-0 bg-[#101010] border-b border-[#262626] px-3 sm:px-4 flex items-center justify-between shadow-sm select-none gap-2 overflow-hidden"
     >
       {/* Left: Brand & Main Navigation Tabs */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-3 sm:gap-5 md:gap-6 shrink-0 min-w-0">
         {/* Brand & Identity */}
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center justify-center w-7 h-7 rounded-md bg-[#161616] text-[#F5C518] border border-[#262626]">
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          <div className="flex items-center justify-center w-7 h-7 rounded-md bg-[#161616] text-[#F5C518] border border-[#262626] shrink-0">
             <Waves className="w-4 h-4" />
           </div>
-          <div>
+          <div className="shrink-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-sm font-semibold text-[#F5F5F5] tracking-tight">
+              <h1 className="text-sm font-semibold text-[#F5F5F5] tracking-tight whitespace-nowrap">
                 OceanX 3D
               </h1>
             </div>
-            <p className="text-[10px] text-[#A3A3A3] leading-none">
+            <p className="text-[10px] text-[#A3A3A3] leading-none whitespace-nowrap">
               Scientific Ocean Workspace
             </p>
           </div>
         </div>
 
         {/* Navigation Tabs (Explore, Compare, Datasets, About) */}
-        <nav className="hidden lg:flex items-center gap-1 text-xs">
+        <nav className="hidden xl:flex items-center gap-1 text-xs shrink-0">
           <button
-            className="px-3 py-1.5 font-medium text-[#F5F5F5] border-b-2 border-[#F5C518] transition-colors cursor-pointer"
+            className="px-2.5 py-1.5 font-medium text-[#F5F5F5] border-b-2 border-[#F5C518] transition-colors cursor-pointer"
           >
             Explore
           </button>
           <button
             onClick={onOpenInfo}
-            className="px-3 py-1.5 text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            className="px-2.5 py-1.5 text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors cursor-pointer"
           >
             Compare
           </button>
           <button
             onClick={onOpenInfo}
-            className="px-3 py-1.5 text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            className="px-2.5 py-1.5 text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors cursor-pointer"
           >
             Datasets
           </button>
           <button
             onClick={onOpenInfo}
-            className="px-3 py-1.5 text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            className="px-2.5 py-1.5 text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors cursor-pointer"
           >
             About
           </button>
         </nav>
       </div>
 
-      {/* Center/Right: Quick Search Bar */}
-      <div className="hidden md:flex items-center flex-1 max-w-xs mx-4">
+      {/* Center: Quick Search Bar */}
+      <div className="hidden lg:flex items-center flex-1 max-w-xs mx-2 min-w-0">
         <div className="relative w-full">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#666666]" />
           <input
@@ -84,7 +84,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             readOnly
             onClick={onOpenInfo}
             placeholder="Search location, float, dataset..."
-            className="w-full h-7.5 pl-8 pr-7 bg-[#161616] border border-[#262626] rounded-md text-xs text-[#F5F5F5] placeholder-[#666666] focus:outline-none focus:border-[#F5C518] cursor-pointer"
+            className="w-full h-7.5 pl-8 pr-7 bg-[#161616] border border-[#262626] rounded-md text-xs text-[#F5F5F5] placeholder-[#666666] focus:outline-none focus:border-[#F5C518] cursor-pointer truncate"
           />
           <kbd className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#666666] bg-[#101010] px-1 rounded border border-[#262626]">
             /
@@ -93,12 +93,12 @@ export const TopBar: React.FC<TopBarProps> = ({
       </div>
 
       {/* Right: Actions & Modals */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {onToggleDebug && (
           <button
             id="btn-toggle-debug-mode"
             onClick={onToggleDebug}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono transition-colors cursor-pointer border ${
+            className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-[11px] font-mono transition-colors cursor-pointer border ${
               state.debugMode
                 ? 'bg-[#161616] text-[#F5C518] border-[#F5C518]'
                 : 'bg-[#161616] hover:bg-[#1e1e1e] text-[#A3A3A3] hover:text-[#F5F5F5] border-[#262626]'
@@ -113,7 +113,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           id="btn-open-export"
           onClick={onOpenExport}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-[#161616] hover:bg-[#1e1e1e] text-[#A3A3A3] hover:text-[#F5F5F5] border border-[#262626] transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs bg-[#161616] hover:bg-[#1e1e1e] text-[#A3A3A3] hover:text-[#F5F5F5] border border-[#262626] transition-colors cursor-pointer"
           title="Export Workspace or Dataset"
         >
           <Download className="w-3.5 h-3.5 text-[#F5C518]" />

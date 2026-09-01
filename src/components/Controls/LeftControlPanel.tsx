@@ -58,7 +58,7 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
   return (
     <div
       id="left-control-panel"
-      className={`relative z-30 flex flex-col h-full bg-[#101010] border-r border-[#262626] shadow-xl transition-all duration-200 select-none ${
+      className={`relative z-30 flex flex-col h-full shrink-0 bg-[#101010] border-r border-[#262626] shadow-xl transition-all duration-200 select-none ${
         isCollapsed ? 'w-12' : 'w-76 md:w-80'
       }`}
     >

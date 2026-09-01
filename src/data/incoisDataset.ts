@@ -529,6 +529,15 @@ export function computePhysicalReferenceModel(
   }
 }
 
+// Fast in-memory cache for numerical model slices
+const MODEL_SLICE_CACHE = new Map<string, {
+  data: Float32Array;
+  width: number;
+  height: number;
+  minVal: number;
+  maxVal: number;
+}>();
+
 // Generate numerical model field grid for temperature or salinity at a given depth and time step
 export function generateOceanGridSlice(
   variable: OceanVariable,
@@ -541,6 +550,12 @@ export function generateOceanGridSlice(
   minVal: number;
   maxVal: number;
 } {
+  const cacheKey = `${variable}_${depth}_${timeStepIndex}`;
+  const cached = MODEL_SLICE_CACHE.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const lons = Math.round((GRID_METADATA.lonMax - GRID_METADATA.lonMin) / GRID_METADATA.lonStep) + 1;
   const lats = Math.round((GRID_METADATA.latMax - GRID_METADATA.latMin) / GRID_METADATA.latStep) + 1;
   const total = lons * lats;
@@ -565,7 +580,13 @@ export function generateOceanGridSlice(
     }
   }
 
-  return { data, width: lons, height: lats, minVal, maxVal };
+  const result = { data, width: lons, height: lats, minVal, maxVal };
+  if (MODEL_SLICE_CACHE.size >= 48) {
+    const first = MODEL_SLICE_CACHE.keys().next().value;
+    if (first) MODEL_SLICE_CACHE.delete(first);
+  }
+  MODEL_SLICE_CACHE.set(cacheKey, result);
+  return result;
 }
 
 // Haversine distance in km between two geo points
