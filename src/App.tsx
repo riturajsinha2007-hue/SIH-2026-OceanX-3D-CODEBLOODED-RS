@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { ARGO_FLOATS, getFloatsFilteredByDiscrepancy, sampleOceanPoint, syncTimeStepForVariable, setDynamicOceansat2TimeSteps, setDynamicArgoVamTimeSteps } from './data/incoisDataset';
 import { DepthLevel, OceanVariable, PointProbeData, VisualizationState } from './types/ocean';
-import { getDefaultRange } from './utils/scientificColormaps';
 import { fetchDynamicOceansat2TimeDimension, fetchDynamicArgoVamTimeDimension } from './services/erddapService';
 import { TopBar } from './components/TopBar/TopBar';
 import { LeftControlPanel } from './components/Controls/LeftControlPanel';
@@ -61,30 +60,19 @@ export default function App() {
       const next = { ...prev, ...updates };
 
       // When shifting variable (e.g. to Chlorophyll or back to Temp/Sal),
-      // synchronize the timeline date to the corresponding dataset period and colormaps!
+      // synchronize the timeline date to the corresponding dataset period!
       if (updates.variable && updates.variable !== prev.variable) {
         const syncedTimeIndex = syncTimeStepForVariable(prev.variable, updates.variable, prev.timeStepIndex);
         next.timeStepIndex = syncedTimeIndex;
-
-        const targetDepth = updates.variable === 'CHLA' ? 5 : (updates.depth !== undefined ? updates.depth : prev.depth);
-        const defRange = getDefaultRange(updates.variable, targetDepth);
-        next.customMin = defRange.min;
-        next.customMax = defRange.max;
-        next.minScaleAuto = true;
-        next.maxScaleAuto = true;
 
         if (updates.variable === 'CHLA') {
           next.depth = 5; // Chlorophyll is surface layer (0-5m)
           if (!updates.colormap) {
             next.colormap = 'incois_rainbow';
           }
-        } else if (updates.variable === 'SAL') {
+        } else if (prev.variable === 'CHLA') {
           if (!updates.colormap) {
-            next.colormap = 'halite';
-          }
-        } else if (updates.variable === 'TEMP') {
-          if (!updates.colormap) {
-            next.colormap = 'thermal';
+            next.colormap = updates.variable === 'TEMP' ? 'thermal' : 'halite';
           }
         }
       }
@@ -137,7 +125,7 @@ export default function App() {
   }, [state.selectedFloatId]);
 
   return (
-    <div id="oceanx-app-root" className="fixed inset-0 flex flex-col h-full w-full overflow-hidden bg-[#040810] text-slate-100 font-sans antialiased">
+    <div id="oceanx-app-root" className="relative flex flex-col h-screen w-screen overflow-hidden bg-[#040810] text-slate-100 font-sans antialiased">
       {/* 1. TOP NAVIGATION & STATUS BAR */}
       <TopBar
         state={state}
@@ -147,7 +135,7 @@ export default function App() {
       />
 
       {/* 2. MAIN SCIENTIFIC WORKSPACE (Left Controls + Center 3D Globe + Right Analysis) */}
-      <div className="relative flex-1 min-h-0 flex flex-row overflow-hidden w-full">
+      <div className="relative flex-1 flex flex-row overflow-hidden w-full h-[calc(100vh-56px-56px)]">
         {/* Left Side Controls */}
         <LeftControlPanel
           state={state}
@@ -157,7 +145,7 @@ export default function App() {
         />
 
         {/* Center 3D Globe Viewer (Unobstructed View) */}
-        <div className="relative flex-1 min-w-0 min-h-0 h-full w-full overflow-hidden bg-[#040810]">
+        <div className="relative flex-1 h-full w-full overflow-hidden bg-[#040810]">
           <OceanGlobe
             state={state}
             onSelectFloat={(id) => handleUpdateState({ selectedFloatId: id, selectedProbePoint: null })}
@@ -179,7 +167,7 @@ export default function App() {
           onChangeVariable={(v: OceanVariable) =>
             handleUpdateState({
               variable: v,
-              colormap: v === 'TEMP' ? 'thermal' : v === 'SAL' ? 'halite' : 'incois_rainbow',
+              colormap: v === 'TEMP' ? 'thermal' : v === 'SAL' ? 'halite' : 'chlorophyll',
             })
           }
         />

@@ -1,39 +1,30 @@
 @import "tailwindcss";
 
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-html, body, #root {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  position: fixed;
-  inset: 0;
-  background-color: #080808;
-  color: #F5F5F5;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  user-select: none;
-  -webkit-font-smoothing: antialiased;
-}
-
 @layer utilities {
   .custom-scrollbar::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
+    width: 6px;
+    height: 6px;
   }
   .custom-scrollbar::-webkit-scrollbar-track {
-    background: #101010;
+    background: rgba(15, 23, 42, 0.6);
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #262626;
+    background: rgba(51, 65, 85, 0.8);
     border-radius: 9999px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #404040;
+    background: rgba(100, 116, 139, 1);
   }
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #040810;
+  color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow: hidden;
+  user-select: none;
 }
 
 /* Cesium Widget Adjustments */
@@ -42,14 +33,14 @@ html, body, #root {
   width: 100% !important;
   height: 100% !important;
   touch-action: none;
-  display: block;
 }
 
 .cesium-widget-credits {
   font-size: 9px !important;
-  opacity: 0.3;
+  opacity: 0.5;
   bottom: 2px !important;
   right: 180px !important;
   pointer-events: none;
 }
+
 

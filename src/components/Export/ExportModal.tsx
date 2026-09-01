@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ARGO_FLOATS } from '../../data/incoisDataset';
 import { VisualizationState } from '../../types/ocean';
-import { X, Download, FileText, Image as ImageIcon, Database, ExternalLink } from 'lucide-react';
+import { X, Download, FileText, Image as ImageIcon, CheckCircle, Database, ExternalLink } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 interface ExportModalProps {
@@ -11,6 +11,7 @@ interface ExportModalProps {
 
 export const ExportModal: React.FC<ExportModalProps> = ({ state, onClose }) => {
   const [isExportingImage, setIsExportingImage] = useState(false);
+  const [copiedNotification, setCopiedNotification] = useState<string | null>(null);
 
   const handleExportScreenshot = async () => {
     setIsExportingImage(true);
@@ -18,7 +19,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ state, onClose }) => {
       const root = document.getElementById('root') || document.body;
       const canvas = await html2canvas(root, {
         useCORS: true,
-        backgroundColor: '#080808',
+        backgroundColor: '#040810',
         logging: false,
       });
 
@@ -86,55 +87,85 @@ export const ExportModal: React.FC<ExportModalProps> = ({ state, onClose }) => {
     document.body.removeChild(link);
   };
 
+  const handleExportJSON = () => {
+    const payload = {
+      project: 'OceanX 3D Scientific Workspace',
+      organization: 'Ministry of Earth Sciences (MoES) / INCOIS',
+      exportTimestamp: new Date().toISOString(),
+      activeLayer: {
+        variable: state.variable,
+        depth_m: state.depth,
+        colormap: state.colormap,
+      },
+      erddapEndpoints: {
+        chlorophyll: 'https://erddap.incois.gov.in/erddap/griddap/incois_oceansat2_datasets.html',
+        argoVAM: 'https://erddap.incois.gov.in/erddap/griddap/incois_argo_10d_VAM.html',
+      },
+      floats: ARGO_FLOATS,
+    };
+
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
+    const link = document.createElement('a');
+    link.setAttribute('href', dataStr);
+    link.setAttribute('download', `OceanX_3D_Discrepancy_Dataset.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div
       id="export-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150"
     >
-      <div className="bg-[#101010] border border-[#262626] rounded-lg max-w-md w-full p-5 shadow-2xl space-y-4 text-[#F5F5F5]">
+      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5">
         {/* Modal Header */}
-        <div className="flex items-center justify-between pb-2.5 border-b border-[#262626]">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center gap-2">
-            <Download className="w-4 h-4 text-[#F5C518]" />
+            <div className="p-2 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/40">
+              <Download className="w-5 h-5" />
+            </div>
             <div>
-              <h3 className="text-sm font-semibold text-[#F5F5F5]">
-                Export Workspace
+              <h3 className="text-base font-bold text-slate-100">
+                Export Scientific Workspace
               </h3>
-              <p className="text-[11px] text-[#A3A3A3]">
-                Download visualizations or numerical data
+              <p className="text-xs text-slate-400">
+                Download high-res visualizations or numerical datasets
               </p>
             </div>
           </div>
           <button
             id="btn-close-export-modal"
             onClick={onClose}
-            className="p-1 rounded text-[#A3A3A3] hover:text-[#F5F5F5] hover:bg-[#161616] transition-colors cursor-pointer"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Options */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           {/* Option 1: Screenshot */}
           <button
             id="btn-download-screenshot"
             onClick={handleExportScreenshot}
             disabled={isExportingImage}
-            className="w-full flex items-center justify-between p-3 rounded-md bg-[#161616] hover:bg-[#1e1e1e] border border-[#262626] hover:border-[#F5C518] transition-colors text-left cursor-pointer"
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-slate-950/60 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-all text-left group cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <ImageIcon className="w-4 h-4 text-[#F5C518]" />
+              <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                <ImageIcon className="w-4 h-4" />
+              </div>
               <div>
-                <div className="text-xs font-semibold text-[#F5F5F5]">
+                <div className="text-sm font-semibold text-slate-200 group-hover:text-amber-300">
                   Workspace Screenshot (PNG)
                 </div>
-                <div className="text-[11px] text-[#A3A3A3]">
+                <div className="text-xs text-slate-400">
                   Full 3D Globe + active numerical depth layer
                 </div>
               </div>
             </div>
-            <span className="text-xs font-mono text-[#F5C518]">
+            <span className="text-xs font-mono text-cyan-400 group-hover:translate-x-0.5 transition-transform">
               {isExportingImage ? 'Generating...' : 'Save PNG →'}
             </span>
           </button>
@@ -143,20 +174,22 @@ export const ExportModal: React.FC<ExportModalProps> = ({ state, onClose }) => {
           <button
             id="btn-download-csv"
             onClick={handleExportCSV}
-            className="w-full flex items-center justify-between p-3 rounded-md bg-[#161616] hover:bg-[#1e1e1e] border border-[#262626] hover:border-[#F5C518] transition-colors text-left cursor-pointer"
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-slate-950/60 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-all text-left group cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <FileText className="w-4 h-4 text-[#F5C518]" />
+              <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <FileText className="w-4 h-4" />
+              </div>
               <div>
-                <div className="text-xs font-semibold text-[#F5F5F5]">
+                <div className="text-sm font-semibold text-slate-200 group-hover:text-emerald-300">
                   Argo Discrepancies Table (CSV)
                 </div>
-                <div className="text-[11px] text-[#A3A3A3]">
+                <div className="text-xs text-slate-400">
                   All float observations & collocated model values
                 </div>
               </div>
             </div>
-            <span className="text-xs font-mono text-[#F5C518]">
+            <span className="text-xs font-mono text-cyan-400 group-hover:translate-x-0.5 transition-transform">
               Save CSV →
             </span>
           </button>
@@ -169,31 +202,33 @@ export const ExportModal: React.FC<ExportModalProps> = ({ state, onClose }) => {
             }
             target="_blank"
             rel="noreferrer"
-            className="w-full flex items-center justify-between p-3 rounded-md bg-[#161616] hover:bg-[#1e1e1e] border border-[#262626] hover:border-[#F5C518] transition-colors text-left"
+            className="w-full flex items-center justify-between p-3.5 rounded-xl bg-slate-950/60 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 transition-all text-left group"
           >
             <div className="flex items-center gap-3">
-              <Database className="w-4 h-4 text-[#F5C518]" />
+              <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <Database className="w-4 h-4" />
+              </div>
               <div>
-                <div className="text-xs font-semibold text-[#F5F5F5]">
-                  INCOIS ERDDAP Server
+                <div className="text-sm font-semibold text-slate-200 group-hover:text-emerald-300">
+                  INCOIS ERDDAP NetCDF / Grid Server
                 </div>
-                <div className="text-[11px] text-[#A3A3A3] font-mono">
-                  {state.variable === 'CHLA' ? 'incois_oceansat2_datasets' : 'incois_argo_10d_VAM'}
+                <div className="text-xs text-slate-400 font-mono">
+                  {state.variable === 'CHLA' ? 'incois_oceansat2_datasets.nc' : 'incois_argo_10d_VAM.nc'}
                 </div>
               </div>
             </div>
-            <span className="text-xs font-mono text-[#F5C518] flex items-center gap-1">
-              <span>Open</span>
+            <span className="text-xs font-mono text-emerald-400 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+              <span>Open Server</span>
               <ExternalLink className="w-3 h-3" />
             </span>
           </a>
         </div>
 
         {/* Footer */}
-        <div className="pt-2 border-t border-[#262626] flex justify-end">
+        <div className="pt-2 border-t border-slate-800 flex justify-end">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 rounded-md text-xs font-medium bg-[#161616] hover:bg-[#1e1e1e] text-[#F5F5F5] border border-[#262626] transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
           >
             Close
           </button>

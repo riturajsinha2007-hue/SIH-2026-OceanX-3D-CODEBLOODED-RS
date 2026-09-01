@@ -384,12 +384,13 @@ export function computeOceanValue(
     }
   }
 
-  // Reliable High-Precision Ocean Climatology Fallback for Static Hostings / Offline / Vercel
-  return computePhysicalReferenceModel(lat, lon, variable, depth, timeStepIndex);
+  // Strict Scientific Mandate: If no verified live ERDDAP data exists for this selection, return NaN
+  return NaN;
 }
 
 /**
- * Isolated Climatological Reference Model (INCOIS VAM & Oceansat-2 High-Resolution Physics)
+ * Isolated Climatological Reference Model (FOR THEORETICAL VALIDATION ONLY)
+ * Never used for scientific layer rendering.
  */
 export function computePhysicalReferenceModel(
   lat: number,
@@ -486,57 +487,13 @@ export function computePhysicalReferenceModel(
     if (depth === 2000) return Math.max(34.6, Math.min(34.9, 34.72));
     return Math.max(34.4, Math.min(35.0, 34.80));
   } else {
-    // Chlorophyll-a: INCOIS Oceansat-2 (OCM-2) Radiometric Spatial Model (mg/m³)
-    let chl = 0.22;
-
-    // 1. Arabian Sea Coastal & Convective Bloom Dynamics (Oman, Pakistan, Gujarat, Western India)
-    const dOman = Math.hypot((lon - 59.0) / 4.5, (lat - 19.0) / 4.0);
-    const dSomali = Math.hypot((lon - 51.0) / 4.5, (lat - 8.5) / 4.5);
-    const dGujarat = Math.hypot((lon - 69.5) / 3.0, (lat - 21.5) / 2.5);
-    const dMalabar = Math.hypot((lon - 74.5) / 2.5, (lat - 11.5) / 4.5);
-
-    // Summer monsoon upwelling & Winter NE monsoon bloom amplification
-    const upwellingFactor = (argoMonth >= 6 && argoMonth <= 9) ? 2.8 : (argoMonth === 1 || argoMonth === 2 || argoMonth === 12) ? 2.2 : 1.2;
-
-    chl += Math.exp(-dOman * dOman) * (1.8 * upwellingFactor);
-    chl += Math.exp(-dSomali * dSomali) * (2.2 * upwellingFactor);
-    chl += Math.exp(-dGujarat * dGujarat) * 2.4;
-    chl += Math.exp(-dMalabar * dMalabar) * (1.4 * upwellingFactor);
-
-    // 2. Northern Bay of Bengal Estuarine & River Delta Plume (Ganges-Brahmaputra-Meghna)
-    const dDelta = Math.hypot((lon - 89.5) / 3.8, (lat - 20.8) / 2.8);
-    const dAndaman = Math.hypot((lon - 93.5) / 2.5, (lat - 12.0) / 4.5);
-    chl += Math.exp(-dDelta * dDelta) * 3.2;
-    chl += Math.exp(-dAndaman * dAndaman) * 0.75;
-
-    // 3. Subtropical Oligotrophic Gyre depletion (lat < -15°S)
-    if (lat < -10.0) {
-      const gyreAtten = Math.min(1.0, Math.pow(Math.abs(lat + 10.0) / 18.0, 1.2));
-      chl = chl * (1.0 - gyreAtten * 0.72);
-    }
-
-    // 4. Sub-mesoscale filaments & eddies
-    const chlNoise = (smoothNoise(lon * 0.35 + argoMonth * 0.2, lat * 0.35) - 0.4) * 0.25;
-    chl = Math.max(0.03, Math.min(8.0, chl + chlNoise));
-
-    // Depth attenuation (euphotic zone decay)
-    if (depth <= 10) return chl;
-    if (depth <= 30) return chl * 0.85;
-    if (depth <= 50) return chl * 0.55;
-    if (depth <= 75) return chl * 0.22;
-    if (depth <= 100) return chl * 0.08;
-    return 0.01;
+    // Chlorophyll-a
+    if (depth <= 10) return 0.18;
+    if (depth <= 50) return 0.24;
+    if (depth <= 100) return 0.09;
+    return 0.02;
   }
 }
-
-// Fast in-memory cache for numerical model slices
-const MODEL_SLICE_CACHE = new Map<string, {
-  data: Float32Array;
-  width: number;
-  height: number;
-  minVal: number;
-  maxVal: number;
-}>();
 
 // Generate numerical model field grid for temperature or salinity at a given depth and time step
 export function generateOceanGridSlice(
@@ -550,12 +507,6 @@ export function generateOceanGridSlice(
   minVal: number;
   maxVal: number;
 } {
-  const cacheKey = `${variable}_${depth}_${timeStepIndex}`;
-  const cached = MODEL_SLICE_CACHE.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
   const lons = Math.round((GRID_METADATA.lonMax - GRID_METADATA.lonMin) / GRID_METADATA.lonStep) + 1;
   const lats = Math.round((GRID_METADATA.latMax - GRID_METADATA.latMin) / GRID_METADATA.latStep) + 1;
   const total = lons * lats;
@@ -580,13 +531,7 @@ export function generateOceanGridSlice(
     }
   }
 
-  const result = { data, width: lons, height: lats, minVal, maxVal };
-  if (MODEL_SLICE_CACHE.size >= 48) {
-    const first = MODEL_SLICE_CACHE.keys().next().value;
-    if (first) MODEL_SLICE_CACHE.delete(first);
-  }
-  MODEL_SLICE_CACHE.set(cacheKey, result);
-  return result;
+  return { data, width: lons, height: lats, minVal, maxVal };
 }
 
 // Haversine distance in km between two geo points

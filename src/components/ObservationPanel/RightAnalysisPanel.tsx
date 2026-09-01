@@ -11,17 +11,27 @@ import {
   X,
   MapPin,
   Activity,
+  Calendar,
   Layers,
+  Database,
+  ExternalLink,
+  Target,
   Copy,
   Check,
+  Thermometer,
+  Waves,
+  Sparkles,
+  ArrowRight,
   Download,
   AlertCircle,
+  CheckCircle2,
   Bug,
-  Sliders,
-  ExternalLink,
-  ChevronRight,
-  ChevronLeft,
+  FileText,
   Eye,
+  Sliders,
+  ChevronDown,
+  Info,
+  Compass,
 } from 'lucide-react';
 
 interface RightAnalysisPanelProps {
@@ -65,7 +75,7 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
     return normalizePlatformId(state.selectedFloatId || selectedFloat?.platformNumber || selectedFloat?.id);
   }, [state.selectedFloatId, selectedFloat]);
 
-  // Retrieve matching CSV records locally
+  // Retrieve matching CSV records locally (Single Source of Truth, 24 depth measurements)
   const matchingCsvRows = useMemo(() => {
     if (!activePlatformId) return [];
     return getRowsForPlatform(activePlatformId);
@@ -94,27 +104,27 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
 
   const unit = profileVar === 'TEMP' ? '°C' : profileVar === 'SAL' ? 'PSU' : 'mg/m³';
 
-  // Strict finite formatting utility
+  // Strict finite formatting utility: NEVER prints NaN or undefined
   const formatVal = (val: number | null | undefined, unitSuffix: string): string => {
     if (typeof val === 'number' && isFinite(val) && !isNaN(val)) {
-      return `${val.toFixed(1)}${unitSuffix}`;
+      return `${val.toFixed(2)}${unitSuffix}`;
     }
-    return '—';
+    return 'Data unavailable';
   };
 
   const formatDelta = (val: number | null | undefined, unitSuffix: string): string => {
     if (typeof val === 'number' && isFinite(val) && !isNaN(val)) {
-      return `${val > 0 ? '+' : ''}${val.toFixed(1)}${unitSuffix}`;
+      return `${val > 0 ? '+' : ''}${val.toFixed(2)}${unitSuffix}`;
     }
-    return '—';
+    return 'Data unavailable';
   };
 
   // SVG Chart Dimensions & Configuration
-  const chartWidth = 280;
-  const chartHeight = 260;
-  const padding = { top: 20, right: 18, bottom: 28, left: 45 };
+  const chartWidth = 310;
+  const chartHeight = 290;
+  const padding = { top: 28, right: 24, bottom: 36, left: 54 };
 
-  // Calculate profile scales & non-linear depth mapping
+  // Calculate profile scales & non-linear depth mapping (Inverted Y-axis: 0m/5m at top down to 2000m at bottom)
   const chartScales = useMemo(() => {
     if (matchingCsvRows.length === 0) return null;
 
@@ -142,12 +152,15 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
       minVal = Math.floor(Math.min(...allValues) - 1.0);
       maxVal = Math.ceil(Math.max(...allValues) + 1.0);
     } else {
+      // Salinity
       minVal = Math.floor((Math.min(...allValues) - 0.3) * 10) / 10;
       maxVal = Math.ceil((Math.max(...allValues) + 0.3) * 10) / 10;
     }
 
     const depths = matchingCsvRows.map((p) => p.depth);
 
+    // Inverted depth: Ocean depth increases downward
+    // Depth index mapping with nice optical spacing for ocean vertical soundings
     const depthToY = (d: number) => {
       const idx = depths.indexOf(d);
       if (idx !== -1) {
@@ -156,6 +169,7 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
           (idx / Math.max(1, depths.length - 1)) * (chartHeight - padding.top - padding.bottom)
         );
       }
+      // Proportional fallback
       const minD = depths[0] || 5;
       const maxD = depths[depths.length - 1] || 2000;
       const ratio = Math.max(0, Math.min(1, (d - minD) / (maxD - minD)));
@@ -205,75 +219,29 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
     return { highDiscrepancyCount, avgDelta };
   }, [allFloats, state.depth, state.variable]);
 
-  // Minimal Palette Line Colors
-  // Observed Curve: Warm Yellow/Gold #F5C518
-  // Model Curve: Refined Gray #737373
-  const varLineColor = '#F5C518';
-  const varModelLineColor = '#737373';
+  // Line Colors per Variable according to scientific requirements:
+  // Temperature: Cyan / Blue line
+  // Salinity: Turquoise line
+  // Chlorophyll: Green line
+  const varLineColor = profileVar === 'TEMP' ? '#06b6d4' : profileVar === 'SAL' ? '#14b8a6' : '#22c55e';
+  const varModelLineColor = profileVar === 'TEMP' ? '#38bdf8' : profileVar === 'SAL' ? '#2dd4bf' : '#4ade80';
 
   // Copy point data to clipboard
   const handleCopyProbeData = () => {
     if (!selectedProbePoint) return;
-    const text = `OceanX 3D Sounding\nBasin: ${selectedProbePoint.basin}\nCoordinates: ${selectedProbePoint.latitude.toFixed(4)}°N, ${selectedProbePoint.longitude.toFixed(4)}°E\nDepth Layer: ${state.depth}m\nTemperature: ${selectedProbePoint.currentValue.temp.toFixed(2)} °C\nSalinity: ${selectedProbePoint.currentValue.sal.toFixed(2)} PSU\nChlorophyll-a: ${selectedProbePoint.currentValue.chla.toFixed(3)} mg/m³`;
+    const text = `INCOIS Point Ocean Sounding\nBasin: ${selectedProbePoint.basin}\nCoordinates: ${selectedProbePoint.latitude.toFixed(4)}°N, ${selectedProbePoint.longitude.toFixed(4)}°E\nDepth Layer: ${state.depth}m\nTemperature: ${selectedProbePoint.currentValue.temp.toFixed(2)} °C\nSalinity: ${selectedProbePoint.currentValue.sal.toFixed(2)} PSU\nChlorophyll-a: ${selectedProbePoint.currentValue.chla.toFixed(3)} mg/m³`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
-  if (isCollapsed) {
-    return (
-      <div
-        id="right-analysis-panel-collapsed"
-        className="relative z-30 flex flex-col items-center justify-between h-full w-12 shrink-0 bg-[#101010] border-l border-[#262626] py-3 shadow-xl select-none text-[#A3A3A3]"
-      >
-        <div className="flex flex-col items-center gap-4">
-          <button
-            onClick={() => setIsCollapsed(false)}
-            className="p-2 rounded-md hover:bg-[#161616] text-[#A3A3A3] hover:text-[#F5C518] border border-transparent hover:border-[#262626] transition-colors cursor-pointer"
-            title="Expand Observation & Analysis Panel"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <div
-            className="text-[10px] font-semibold text-[#F5F5F5] uppercase tracking-wider -rotate-90 origin-center my-8 whitespace-nowrap cursor-pointer hover:text-[#F5C518] transition-colors"
-            onClick={() => setIsCollapsed(false)}
-          >
-            Analysis & Legend
-          </div>
-        </div>
-
-        <button
-          onClick={() => setIsCollapsed(false)}
-          className="p-2 rounded-md hover:bg-[#161616] text-[#A3A3A3] hover:text-[#F5F5F5] border border-transparent hover:border-[#262626] transition-colors cursor-pointer"
-          title="Open Legend & Depth Profile"
-        >
-          <Activity className="w-4 h-4 text-[#F5C518]" />
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div
       id="right-analysis-panel"
-      className="relative z-30 flex flex-col h-full w-76 sm:w-80 lg:w-84 xl:w-88 shrink-0 bg-[#101010] border-l border-[#262626] shadow-xl overflow-y-auto custom-scrollbar select-none text-[#F5F5F5]"
+      className="relative z-30 flex flex-col h-full w-84 md:w-98 bg-slate-900/95 backdrop-blur-xl border-l border-slate-700/60 shadow-2xl overflow-y-auto custom-scrollbar"
     >
-      {/* 0. DOCKED ACTIVE VARIABLE & COLORBAR LEGEND WITH COLLAPSE TOGGLE */}
-      <div className="p-3 pb-2 border-b border-[#262626] bg-[#101010] shrink-0">
-        <div className="flex items-center justify-between pb-1.5">
-          <span className="text-[10px] font-mono text-[#A3A3A3] uppercase tracking-wider">
-            Observation & Analysis
-          </span>
-          <button
-            onClick={() => setIsCollapsed(true)}
-            className="p-1 rounded hover:bg-[#161616] text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors cursor-pointer"
-            title="Collapse Analysis Panel"
-          >
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
+      {/* 0. DOCKED ACTIVE VARIABLE & COLORBAR LEGEND */}
+      <div className="p-3.5 pb-2.5 border-b border-slate-800/80 bg-slate-950/50 shrink-0">
         <ScientificLegend state={state} />
       </div>
 
@@ -281,112 +249,111 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
       {state.debugMode && (
         <div
           id="state-sync-debug-overlay"
-          className="m-3 p-3 bg-[#161616] border border-[#F5C518] rounded-md text-xs space-y-1.5 shadow-xl"
+          className="m-3 p-3 bg-amber-950/80 border border-amber-500/80 rounded-xl text-xs space-y-1.5 shadow-xl animate-fade-in"
         >
-          <div className="flex items-center justify-between border-b border-[#262626] pb-1.5">
-            <div className="flex items-center gap-1.5 text-[#F5C518] font-bold font-mono">
-              <Bug className="w-3.5 h-3.5" />
+          <div className="flex items-center justify-between border-b border-amber-700/60 pb-1.5">
+            <div className="flex items-center gap-1.5 text-amber-300 font-bold font-mono">
+              <Bug className="w-3.5 h-3.5 text-amber-400" />
               <span>CSV SINGLE SOURCE OF TRUTH</span>
             </div>
-            <span className="px-1.5 py-0.5 rounded bg-[#101010] text-[#A3A3A3] font-mono text-[10px] border border-[#262626]">
-              LOCAL
+            <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px] border border-emerald-500/40">
+              LOCAL IN-MEMORY
             </span>
           </div>
 
-          <div className="font-mono text-[11px] text-[#A3A3A3] space-y-1">
+          <div className="font-mono text-[11px] text-amber-200/90 space-y-1">
             <div className="flex justify-between">
-              <span>Platform:</span>
-              <span className="text-[#F5F5F5] font-semibold">{activePlatformId || 'None'}</span>
+              <span className="text-amber-400/80">Selected Platform:</span>
+              <span className="text-slate-100 font-semibold">{activePlatformId || 'None'}</span>
             </div>
             <div className="flex justify-between">
-              <span>CSV Records:</span>
-              <span className="text-[#F5C518] font-semibold">{matchingCsvRows.length} rows</span>
+              <span className="text-amber-400/80">Matching CSV Rows:</span>
+              <span className="text-cyan-300 font-semibold">{matchingCsvRows.length} rows</span>
             </div>
             <div className="flex justify-between">
-              <span>Active Depth:</span>
-              <span className="text-[#F5F5F5] font-semibold">{state.depth}m</span>
+              <span className="text-amber-400/80">Active Depth:</span>
+              <span className="text-amber-300 font-semibold">{state.depth}m</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-amber-400/80">Active Variable:</span>
+              <span className="text-emerald-300 font-semibold">{profileVar}</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* 1. ARGO IN-SITU FLOAT VIEW (MATCHING REFERENCE IMAGE) */}
+      {/* 1. ARGO IN-SITU FLOAT VIEW (FROM CSV DATA) */}
       {activePlatformId ? (
         matchingCsvRows.length > 0 && platformMeta ? (
-          <div className="flex flex-col p-3.5 space-y-3.5">
-            {/* Header: Selected Observation & Active Badge */}
-            <div className="flex items-center justify-between pb-2 border-b border-[#262626]">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-semibold text-[#A3A3A3] uppercase tracking-wider">
-                  Selected Observation
-                </span>
-                <span className="text-[10px] font-medium text-[#F5C518] bg-[#161616] border border-[#262626] px-1.5 py-0.2 rounded">
-                  Active
-                </span>
+          <div className="flex flex-col p-4 space-y-4">
+            {/* Header with Close & CSV Download */}
+            <div className="flex items-start justify-between pb-3 border-b border-slate-800">
+              <div>
+                <div className="flex items-center gap-1.5 text-xs font-mono text-cyan-400 font-semibold">
+                  <MapPin className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>IN-SITU SOUNDING PLATFORM</span>
+                </div>
+                <h2 className="text-base font-bold text-slate-100 flex items-center gap-2 mt-0.5">
+                  <span>Argo WMO #{platformMeta.wmoId}</span>
+                  <span className="px-2 py-0.5 text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    <span>QC Flag #{currentDepthRow?.qcFlag || 1}</span>
+                  </span>
+                </h2>
               </div>
               <div className="flex items-center gap-1">
                 <button
                   id="btn-download-float-csv"
                   onClick={() => downloadArgoCsv(platformMeta.wmoId)}
                   title="Download Float Sounding CSV"
-                  className="p-1 rounded text-[#A3A3A3] hover:text-[#F5F5F5] hover:bg-[#161616] transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors cursor-pointer"
                 >
-                  <Download className="w-3.5 h-3.5" />
+                  <Download className="w-4 h-4" />
                 </button>
                 <button
                   id="btn-close-analysis-panel"
                   onClick={onClose}
-                  className="p-1 rounded text-[#A3A3A3] hover:text-[#F5F5F5] hover:bg-[#161616] transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
-            {/* Float Title */}
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-[#F5C518] shrink-0" />
-              <h2 className="text-sm font-semibold text-[#F5F5F5]">
-                Argo Float {platformMeta.wmoId}
-              </h2>
-            </div>
-
-            {/* Metadata Rows (Clean key-value pairs matching reference) */}
-            <div className="space-y-1.5 text-xs text-[#A3A3A3]">
-              <div className="flex justify-between py-0.5 border-b border-[#1f1f1f]">
-                <span>Location</span>
-                <span className="font-mono text-[#F5F5F5]">
-                  {platformMeta.latitude.toFixed(2)}° N, {platformMeta.longitude.toFixed(2)}° E
+            {/* Float Metadata Grid */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-medium">Basin Sector</span>
+                <span className="font-semibold text-slate-200 truncate block">{platformMeta.basin}</span>
+              </div>
+              <div className="bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-medium">Cycle / Platform</span>
+                <span className="font-mono font-semibold text-cyan-300">
+                  Cycle #{platformMeta.cycleNumber}
                 </span>
               </div>
-              <div className="flex justify-between py-0.5 border-b border-[#1f1f1f]">
-                <span>Date / Time</span>
-                <span className="font-mono text-[#F5F5F5]">
-                  {platformMeta.date}, 08:30 UTC
+              <div className="bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-medium">Coordinates</span>
+                <span className="font-mono text-slate-200 text-[11px]">
+                  {platformMeta.latitude.toFixed(2)}°N, {platformMeta.longitude.toFixed(2)}°E
                 </span>
               </div>
-              <div className="flex justify-between py-0.5 border-b border-[#1f1f1f]">
-                <span>Max Depth</span>
-                <span className="font-mono text-[#F5F5F5]">2000 m</span>
-              </div>
-              <div className="flex justify-between py-0.5 border-b border-[#1f1f1f]">
-                <span>Platform Type</span>
-                <span className="text-[#F5F5F5]">{platformMeta.sensorType || 'Argo Profiling Float'}</span>
-              </div>
-              <div className="flex justify-between py-0.5">
-                <span>Data Source</span>
-                <span className="text-[#F5F5F5] truncate max-w-[150px]">{platformMeta.institution}</span>
+              <div className="bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                <span className="text-[10px] text-slate-400 block font-medium">Sounding Date</span>
+                <span className="font-mono text-slate-300 text-[11px]">
+                  {platformMeta.date}
+                </span>
               </div>
             </div>
 
-            {/* Depth Selector Pills */}
-            <div className="space-y-1 pt-1">
-              <div className="flex items-center justify-between text-xs text-[#A3A3A3]">
+            {/* Quick Depth Layer Selector */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
                 <span className="flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-[#F5C518]" />
-                  <span>Observation Depth</span>
+                  <Layers className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Sounding Depth Layer</span>
                 </span>
-                <span className="font-mono text-[#F5C518] font-medium">{state.depth} m</span>
+                <span className="font-mono text-amber-300 font-bold">{state.depth}m</span>
               </div>
               <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar">
                 {STANDARD_DEPTHS.map((d) => {
@@ -396,10 +363,10 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
                       key={`depth-btn-${d}`}
                       id={`depth-select-${d}`}
                       onClick={() => onChangeDepth(d)}
-                      className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors cursor-pointer whitespace-nowrap ${
+                      className={`px-2.5 py-1 text-xs font-mono rounded-lg border transition-all cursor-pointer whitespace-nowrap ${
                         isAct
-                          ? 'bg-[#161616] text-[#F5C518] border-[#F5C518] font-medium'
-                          : 'bg-[#161616] text-[#A3A3A3] border-[#262626] hover:border-[#404040] hover:text-[#F5F5F5]'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 font-bold shadow-sm'
+                          : 'bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200'
                       }`}
                     >
                       {d}m
@@ -409,31 +376,161 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
               </div>
             </div>
 
+            {/* Observed vs Model Values Card at Selected Depth */}
+            <div className="p-3 rounded-xl bg-gradient-to-br from-slate-950/90 to-slate-900 border border-slate-700/80 shadow-lg space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>In-Situ Sounding ({inspectedRow ? inspectedRow.depth : state.depth}m)</span>
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">
+                  Δ = Obs − Model
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-800">
+                  <span className="text-[10px] text-slate-400 block">Observed</span>
+                  <span className="font-mono font-bold text-emerald-400 text-sm">
+                    {profileVar === 'TEMP'
+                      ? formatVal(inspectedRow?.temperature, '°C')
+                      : profileVar === 'SAL'
+                      ? formatVal(inspectedRow?.salinity, 'PSU')
+                      : formatVal(inspectedRow?.chlorophyll, 'mg/m³')}
+                  </span>
+                </div>
+                <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-800">
+                  <span className="text-[10px] text-slate-400 block">INCOIS Model</span>
+                  <span className="font-mono font-bold text-cyan-400 text-sm">
+                    {profileVar === 'TEMP'
+                      ? formatVal(inspectedRow?.modelTemperature, '°C')
+                      : profileVar === 'SAL'
+                      ? formatVal(inspectedRow?.modelSalinity, 'PSU')
+                      : formatVal(inspectedRow?.modelChlorophyll, 'mg/m³')}
+                  </span>
+                </div>
+                <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-800">
+                  <span className="text-[10px] text-slate-400 block">Anomaly Δ</span>
+                  <span
+                    className={`font-mono font-bold text-sm ${
+                      profileVar === 'TEMP'
+                        ? Math.abs(inspectedRow?.tempAnomaly || 0) >= 1.0
+                          ? 'text-red-400'
+                          : 'text-emerald-400'
+                        : profileVar === 'SAL'
+                        ? Math.abs(inspectedRow?.salAnomaly || 0) >= 1.0
+                          ? 'text-red-400'
+                          : 'text-emerald-400'
+                        : Math.abs(inspectedRow?.chlaAnomaly || 0) >= 0.5
+                        ? 'text-red-400'
+                        : 'text-emerald-400'
+                    }`}
+                  >
+                    {profileVar === 'TEMP'
+                      ? formatDelta(inspectedRow?.tempAnomaly, '°C')
+                      : profileVar === 'SAL'
+                      ? formatDelta(inspectedRow?.salAnomaly, 'PSU')
+                      : formatDelta(inspectedRow?.chlaAnomaly, 'mg/m³')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Sensor & Institution citation */}
+              <div className="text-[10px] text-slate-500 font-mono flex items-center justify-between pt-1 border-t border-slate-800/80">
+                <span className="truncate max-w-[180px]">{platformMeta.sensorType}</span>
+                <span className="text-slate-400 truncate max-w-[140px]">{platformMeta.institution}</span>
+              </div>
+            </div>
+
+            {/* DEDICATED ANOMALY INFORMATION DISPLAY CARDS */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+                <span className="flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Observation Anomaly Diagnostics</span>
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">Layer {state.depth}m</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {/* Temperature Anomaly Card */}
+                <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+                      <Thermometer className="w-3 h-3 text-cyan-400" />
+                      <span>Temp Anomaly</span>
+                    </span>
+                    <span
+                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
+                        Math.abs(currentDepthRow?.tempAnomaly || 0) >= 1.0
+                          ? 'bg-red-500/20 text-red-300 border border-red-500/40'
+                          : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      }`}
+                    >
+                      {Math.abs(currentDepthRow?.tempAnomaly || 0) >= 1.0 ? 'High' : 'Normal'}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex items-baseline justify-between">
+                    <span className="font-mono text-sm font-bold text-slate-100">
+                      {formatDelta(currentDepthRow?.tempAnomaly, '°C')}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      Obs: {formatVal(currentDepthRow?.temperature, '°C')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Salinity Anomaly Card */}
+                <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+                      <Waves className="w-3 h-3 text-teal-400" />
+                      <span>Sal Anomaly</span>
+                    </span>
+                    <span
+                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
+                        Math.abs(currentDepthRow?.salAnomaly || 0) >= 0.8
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      }`}
+                    >
+                      {Math.abs(currentDepthRow?.salAnomaly || 0) >= 0.8 ? 'High' : 'Normal'}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex items-baseline justify-between">
+                    <span className="font-mono text-sm font-bold text-slate-100">
+                      {formatDelta(currentDepthRow?.salAnomaly, ' PSU')}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      Obs: {formatVal(currentDepthRow?.salinity, ' PSU')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* VERTICAL PROFILE GRAPH (SCIENTIFIC SOUNDING CURVE) */}
-            <div className="p-3 bg-[#161616] rounded-md border border-[#262626] space-y-2.5">
-              {/* Header & Controls: Variable Tabs & Comparison Mode */}
+            <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800 space-y-3">
+              {/* Header & Controls: Variable Tabs & Model Comparison Toggle */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-[#A3A3A3] uppercase tracking-wider">
-                    {profileVar === 'TEMP'
-                      ? 'Temperature Profile (°C)'
-                      : profileVar === 'SAL'
-                      ? 'Salinity Profile (PSU)'
-                      : 'Chlorophyll Profile (mg/m³)'}
+                  <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Vertical Profile Curve</span>
                   </span>
 
-                  {/* Variable Tabs */}
-                  <div className="flex items-center gap-1 text-[10px]">
+                  {/* Variable Tabs: Temperature, Salinity, Chlorophyll */}
+                  <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800 text-[10px]">
                     <button
                       id="btn-profile-temp"
                       onClick={() => {
                         setProfileVar('TEMP');
                         onChangeVariable('TEMP');
                       }}
-                      className={`px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                      className={`px-2 py-0.5 rounded font-medium transition-colors cursor-pointer ${
                         profileVar === 'TEMP'
-                          ? 'bg-[#101010] text-[#F5C518] border-[#F5C518]'
-                          : 'bg-[#101010] text-[#A3A3A3] border-[#262626] hover:text-[#F5F5F5]'
+                          ? 'bg-cyan-500 text-slate-950 font-bold'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
                       Temp
@@ -444,13 +541,13 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
                         setProfileVar('SAL');
                         onChangeVariable('SAL');
                       }}
-                      className={`px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                      className={`px-2 py-0.5 rounded font-medium transition-colors cursor-pointer ${
                         profileVar === 'SAL'
-                          ? 'bg-[#101010] text-[#F5C518] border-[#F5C518]'
-                          : 'bg-[#101010] text-[#A3A3A3] border-[#262626] hover:text-[#F5F5F5]'
+                          ? 'bg-teal-500 text-slate-950 font-bold'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      Sal
+                      Salinity
                     </button>
                     <button
                       id="btn-profile-chla"
@@ -458,28 +555,28 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
                         setProfileVar('CHLA');
                         onChangeVariable('CHLA');
                       }}
-                      className={`px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                      className={`px-2 py-0.5 rounded font-medium transition-colors cursor-pointer ${
                         profileVar === 'CHLA'
-                          ? 'bg-[#101010] text-[#F5C518] border-[#F5C518]'
-                          : 'bg-[#101010] text-[#A3A3A3] border-[#262626] hover:text-[#F5F5F5]'
+                          ? 'bg-emerald-500 text-slate-950 font-bold'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      Chl
+                      Chl-a
                     </button>
                   </div>
                 </div>
 
-                {/* Comparison Mode Selector */}
-                <div className="flex items-center justify-between text-[10px] bg-[#101010] p-1 rounded border border-[#262626]">
-                  <span className="text-[#666666] pl-1">Series:</span>
+                {/* Model Comparison Toggle: [Both] [Observed] [Model] */}
+                <div className="flex items-center justify-between text-[11px] bg-slate-900/80 p-1 rounded-lg border border-slate-800">
+                  <span className="text-slate-400 text-[10px] pl-1 font-medium">Comparison:</span>
                   <div className="flex items-center gap-1">
                     <button
                       id="btn-compare-both"
                       onClick={() => setCompareMode('both')}
-                      className={`px-1.5 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors cursor-pointer ${
                         compareMode === 'both'
-                          ? 'bg-[#161616] text-[#F5C518] border border-[#F5C518]'
-                          : 'text-[#A3A3A3] hover:text-[#F5F5F5]'
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
                       Obs + Model
@@ -487,21 +584,21 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
                     <button
                       id="btn-compare-obs"
                       onClick={() => setCompareMode('observed')}
-                      className={`px-1.5 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors cursor-pointer ${
                         compareMode === 'observed'
-                          ? 'bg-[#161616] text-[#F5C518] border border-[#F5C518]'
-                          : 'text-[#A3A3A3] hover:text-[#F5F5F5]'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      Argo
+                      Observed
                     </button>
                     <button
                       id="btn-compare-model"
                       onClick={() => setCompareMode('model')}
-                      className={`px-1.5 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors cursor-pointer ${
                         compareMode === 'model'
-                          ? 'bg-[#161616] text-[#F5C518] border border-[#F5C518]'
-                          : 'text-[#A3A3A3] hover:text-[#F5F5F5]'
+                          ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 font-bold'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
                       Model
@@ -523,23 +620,23 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
                       {/* Depth Axis Title */}
                       <text
                         x={10}
-                        y={padding.top - 8}
-                        className="text-[9px] font-mono fill-[#A3A3A3]"
+                        y={padding.top - 12}
+                        className="text-[9px] font-mono fill-slate-400 font-bold"
                       >
-                        Depth (m)
+                        Depth (m) ↓
                       </text>
 
                       {/* Variable Unit Title */}
                       <text
                         x={chartWidth - padding.right}
-                        y={padding.top - 8}
+                        y={padding.top - 12}
                         textAnchor="end"
-                        className="text-[9px] font-mono fill-[#A3A3A3]"
+                        className="text-[9px] font-mono fill-slate-400 font-bold"
                       >
-                        {unit}
+                        {profileVar} ({unit}) →
                       </text>
 
-                      {/* Value Ticks */}
+                      {/* Value Ticks along top/bottom */}
                       {(() => {
                         const stepCount = 4;
                         const ticks: number[] = [];
@@ -556,15 +653,15 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
                                 y1={padding.top}
                                 x2={x}
                                 y2={chartHeight - padding.bottom}
-                                stroke="#262626"
+                                stroke="#1e293b"
                                 strokeDasharray="2,2"
                                 strokeWidth="0.8"
                               />
                               <text
                                 x={x}
-                                y={chartHeight - padding.bottom + 12}
+                                y={chartHeight - padding.bottom + 14}
                                 textAnchor="middle"
-                                className="text-[8px] font-mono fill-[#666666]"
+                                className="text-[8px] font-mono fill-slate-500"
                               >
                                 {t.toFixed(profileVar === 'SAL' ? 1 : 0)}
                               </text>
@@ -573,7 +670,7 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
                         });
                       })()}
 
-                      {/* Depth Grid Lines (0m down to 2000m) */}
+                      {/* Standard Depth Grid Lines (Inverted: 0m at top down to 2000m at bottom) */}
                       {chartScales.depths.map((d) => {
                         const y = chartScales.depthToY(d);
                         const isActiveDepth = d === state.depth;
@@ -585,32 +682,32 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
                               y1={y}
                               x2={chartWidth - padding.right}
                               y2={y}
-                              stroke={isActiveDepth ? '#F5C518' : '#262626'}
+                              stroke={isActiveDepth ? '#f59e0b' : isHovered ? '#64748b' : '#334155'}
                               strokeDasharray={isActiveDepth ? '4,2' : '2,2'}
-                              strokeWidth={isActiveDepth ? 1.4 : 0.8}
-                              opacity={isActiveDepth ? 0.9 : 0.4}
+                              strokeWidth={isActiveDepth ? 1.6 : 0.8}
+                              opacity={isActiveDepth ? 0.9 : 0.35}
                             />
                             <text
                               x={padding.left - 6}
-                              y={y + 3}
+                              y={y + 3.5}
                               textAnchor="end"
-                              className={`text-[8.5px] font-mono cursor-pointer transition-colors ${
+                              className={`text-[9px] font-mono cursor-pointer transition-colors ${
                                 isActiveDepth
-                                  ? 'fill-[#F5C518] font-bold'
+                                  ? 'fill-amber-400 font-bold'
                                   : isHovered
-                                  ? 'fill-[#F5F5F5]'
-                                  : 'fill-[#666666] hover:fill-[#A3A3A3]'
+                                  ? 'fill-cyan-300 font-semibold'
+                                  : 'fill-slate-500 hover:fill-slate-300'
                               }`}
                               onClick={() => onChangeDepth(d)}
                               onMouseEnter={() => setHoveredDepth(d)}
                             >
-                              {d}
+                              {d}m
                             </text>
                           </g>
                         );
                       })}
 
-                      {/* INCOIS Model Curve (Gray Dashed Line) */}
+                      {/* INCOIS Model Curve (Dashed Line) */}
                       {(compareMode === 'both' || compareMode === 'model') &&
                         (() => {
                           const validMod = matchingCsvRows.filter((r) => {
@@ -631,14 +728,14 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
                               d={pathD}
                               fill="none"
                               stroke={varModelLineColor}
-                              strokeWidth="1.6"
+                              strokeWidth="1.8"
                               strokeDasharray="4,3"
-                              opacity={0.8}
+                              opacity={compareMode === 'both' ? 0.75 : 1.0}
                             />
                           );
                         })()}
 
-                      {/* Observed Curve (Warm Yellow Line) */}
+                      {/* Observed Curve (Solid Line per Variable Color) */}
                       {(compareMode === 'both' || compareMode === 'observed') &&
                         (() => {
                           const validObs = matchingCsvRows.filter((r) => {
@@ -659,7 +756,7 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
                               d={pathD}
                               fill="none"
                               stroke={varLineColor}
-                              strokeWidth="2.2"
+                              strokeWidth="2.4"
                             />
                           );
                         })()}
@@ -675,10 +772,11 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
                         return (
                           <g
                             key={`pt-${r.depth}`}
-                            className="cursor-pointer"
+                            className="cursor-pointer group"
                             onClick={() => onChangeDepth(r.depth)}
                             onMouseEnter={() => setHoveredDepth(r.depth)}
                           >
+                            {/* Hit-area transparent bar for seamless hover */}
                             <rect
                               x={padding.left}
                               y={y - 5}
@@ -687,35 +785,35 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
                               fill="transparent"
                             />
 
-                            {/* Model Point */}
+                            {/* Model Point Circle */}
                             {(compareMode === 'both' || compareMode === 'model') &&
                               typeof mod === 'number' &&
                               isFinite(mod) && (
                                 <circle
                                   cx={chartScales.valToX(mod)}
                                   cy={y}
-                                  r={isActive || isHovered ? 4 : 2.5}
-                                  fill="#737373"
-                                  stroke="#101010"
-                                  strokeWidth="1"
+                                  r={isActive || isHovered ? 4.5 : 3}
+                                  fill={varModelLineColor}
+                                  stroke="#0f172a"
+                                  strokeWidth="1.2"
                                 />
                               )}
 
-                            {/* Observed Point */}
+                            {/* Observed Point Circle */}
                             {(compareMode === 'both' || compareMode === 'observed') &&
                               typeof obs === 'number' &&
                               isFinite(obs) && (
                                 <circle
                                   cx={chartScales.valToX(obs)}
                                   cy={y}
-                                  r={isActive ? 4.5 : isHovered ? 4 : 3}
-                                  fill="#F5C518"
-                                  stroke="#101010"
-                                  strokeWidth="1.2"
+                                  r={isActive ? 5.5 : isHovered ? 5 : 3.5}
+                                  fill={varLineColor}
+                                  stroke="#0f172a"
+                                  strokeWidth="1.5"
                                 />
                               )}
 
-                            {/* Active Ring */}
+                            {/* Active Depth Ring */}
                             {isActive && (
                               <circle
                                 cx={
@@ -724,10 +822,11 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
                                     : chartScales.valToX(mod || 0)
                                 }
                                 cy={y}
-                                r={7}
+                                r={8}
                                 fill="none"
-                                stroke="#F5C518"
-                                strokeWidth="1.4"
+                                stroke="#f59e0b"
+                                strokeWidth="1.8"
+                                className="animate-pulse"
                               />
                             )}
                           </g>
@@ -737,253 +836,170 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
                   </div>
 
                   {/* Chart Legend */}
-                  <div className="flex items-center justify-center gap-4 mt-2 text-[10px] text-[#A3A3A3]">
+                  <div className="flex items-center justify-center gap-3.5 mt-2.5 text-[10px] text-slate-400">
                     {(compareMode === 'both' || compareMode === 'observed') && (
                       <div className="flex items-center gap-1.5">
-                        <div className="w-3 h-1 rounded-full bg-[#F5C518]" />
-                        <span className="text-[#F5F5F5]">Argo Observation</span>
+                        <div
+                          className="w-3.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: varLineColor }}
+                        />
+                        <span className="text-slate-300 font-medium">Observed (In-Situ)</span>
                       </div>
                     )}
                     {(compareMode === 'both' || compareMode === 'model') && (
                       <div className="flex items-center gap-1.5">
-                        <div className="w-3 h-0.5 border-t border-dashed border-[#737373]" />
-                        <span className="text-[#A3A3A3]">Model (Collocated)</span>
+                        <div
+                          className="w-3.5 h-0.5 border-t-2 border-dashed"
+                          style={{ borderColor: varModelLineColor }}
+                        />
+                        <span className="text-slate-300 font-medium">INCOIS Model</span>
                       </div>
                     )}
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 rounded-full border border-amber-400 bg-amber-400/20" />
+                      <span>{state.depth}m Layer</span>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
-
-            {/* MODEL vs OBSERVATION STATS CARD (MATCHING REFERENCE IMAGE) */}
-            <div className="p-3 rounded-md bg-[#161616] border border-[#262626] space-y-2">
-              <div className="text-[11px] font-semibold text-[#A3A3A3] uppercase tracking-wider">
-                Model vs Observation at {inspectedRow ? inspectedRow.depth : state.depth} m
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-[#101010] p-2 rounded border border-[#262626]">
-                  <span className="text-[10px] text-[#A3A3A3] block">Model ({unit})</span>
-                  <span className="font-mono font-bold text-[#F5F5F5] text-sm">
-                    {profileVar === 'TEMP'
-                      ? formatVal(inspectedRow?.modelTemperature, '')
-                      : profileVar === 'SAL'
-                      ? formatVal(inspectedRow?.modelSalinity, '')
-                      : formatVal(inspectedRow?.modelChlorophyll, '')}
-                  </span>
-                </div>
-                <div className="bg-[#101010] p-2 rounded border border-[#262626]">
-                  <span className="text-[10px] text-[#A3A3A3] block">Observation ({unit})</span>
-                  <span className="font-mono font-bold text-[#F5F5F5] text-sm">
-                    {profileVar === 'TEMP'
-                      ? formatVal(inspectedRow?.temperature, '')
-                      : profileVar === 'SAL'
-                      ? formatVal(inspectedRow?.salinity, '')
-                      : formatVal(inspectedRow?.chlorophyll, '')}
-                  </span>
-                </div>
-                <div className="bg-[#101010] p-2 rounded border border-[#262626]">
-                  <span className="text-[10px] text-[#A3A3A3] block">Difference ({unit})</span>
-                  <span className="font-mono font-bold text-[#F5C518] text-sm">
-                    {profileVar === 'TEMP'
-                      ? formatDelta(inspectedRow?.tempAnomaly, '')
-                      : profileVar === 'SAL'
-                      ? formatDelta(inspectedRow?.salAnomaly, '')
-                      : formatDelta(inspectedRow?.chlaAnomaly, '')}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Button: View Profile Details */}
-            <button
-              onClick={() => downloadArgoCsv(platformMeta.wmoId)}
-              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-medium bg-[#161616] hover:bg-[#1e1e1e] text-[#F5F5F5] border border-[#262626] hover:border-[#F5C518] transition-colors cursor-pointer"
-            >
-              <span>Download Sounding CSV</span>
-              <ExternalLink className="w-3.5 h-3.5 text-[#F5C518]" />
-            </button>
           </div>
         ) : (
-          /* NO MATCHING DATA */
+          /* NO MATCHING DATA FOR CLICKED PLATFORM */
           <div className="flex flex-col p-4 space-y-4">
-            <div className="flex items-start justify-between pb-3 border-b border-[#262626]">
-              <h2 className="text-sm font-semibold text-[#F5F5F5]">
+            <div className="flex items-start justify-between pb-3 border-b border-slate-800">
+              <h2 className="text-base font-bold text-slate-100">
                 Argo Platform #{activePlatformId}
               </h2>
               <button
                 onClick={onClose}
-                className="p-1 rounded text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-3 rounded-md bg-[#161616] border border-[#262626] text-xs text-[#A3A3A3] space-y-1">
-              <div className="flex items-center gap-2 text-[#F5C518]">
-                <AlertCircle className="w-4 h-4" />
+            <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-800/60 text-amber-200 text-xs flex flex-col gap-2">
+              <div className="flex items-center gap-2 font-semibold text-amber-300">
+                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>No profile data available for this platform.</span>
               </div>
-              <p className="text-[11px] text-[#666666]">
-                The platform identifier does not contain matching vertical records in the loaded dataset.
+              <p className="text-[11px] text-amber-300/80 leading-relaxed">
+                The requested platform identifier does not contain matching vertical sounding records in the loaded CSV dataset.
               </p>
             </div>
           </div>
         )
       ) : selectedProbePoint ? (
         /* 2. ARBITRARY OCEAN GRID NODE PROBE VIEW */
-        <div className="flex flex-col p-3.5 space-y-3.5">
-          <div className="flex items-start justify-between pb-2 border-b border-[#262626]">
+        <div className="flex flex-col p-4 space-y-4">
+          <div className="flex items-start justify-between pb-3 border-b border-slate-800">
             <div>
-              <span className="text-[11px] font-semibold text-[#A3A3A3] uppercase tracking-wider">
-                Ocean Point Probe
-              </span>
-              <h2 className="text-sm font-semibold text-[#F5F5F5] mt-0.5">
+              <div className="flex items-center gap-1.5 text-xs font-mono text-cyan-400 font-semibold">
+                <Target className="w-3.5 h-3.5" />
+                <span>4D OCEAN POINT PROBE</span>
+              </div>
+              <h2 className="text-base font-bold text-slate-100 mt-0.5">
                 {selectedProbePoint.isLand ? 'Continental Landmass' : selectedProbePoint.basin}
               </h2>
             </div>
             <button
               id="btn-close-probe-panel"
               onClick={onCloseProbe}
-              className="p-1 rounded text-[#A3A3A3] hover:text-[#F5F5F5] hover:bg-[#161616] transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="bg-[#161616] p-2.5 rounded border border-[#262626]">
-              <span className="text-[10px] text-[#666666] block">Coordinates</span>
-              <span className="font-mono text-[#F5F5F5] text-[11px]">
-                {selectedProbePoint.latitude.toFixed(2)}°N, {selectedProbePoint.longitude.toFixed(2)}°E
+            <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+              <span className="text-[10px] text-slate-400 block font-medium">Coordinates</span>
+              <span className="font-mono text-slate-200 text-[11px]">
+                {selectedProbePoint.latitude.toFixed(3)}°N, {selectedProbePoint.longitude.toFixed(3)}°E
               </span>
             </div>
-            <div className="bg-[#161616] p-2.5 rounded border border-[#262626]">
-              <span className="text-[10px] text-[#666666] block">Depth Layer</span>
-              <span className="font-mono text-[#F5C518] text-[11px]">
-                {state.depth} m
+            <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+              <span className="text-[10px] text-slate-400 block font-medium">Inspection Depth</span>
+              <span className="font-mono text-amber-300 font-semibold">
+                {state.depth}m Layer
               </span>
             </div>
           </div>
 
           {/* Model Value Display */}
-          <div className="p-3 rounded-md bg-[#161616] border border-[#262626] space-y-2">
-            <span className="text-xs font-medium text-[#A3A3A3] block">
+          <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+            <span className="text-xs font-semibold text-slate-300 block">
               Collocated Model Parameter
             </span>
-            <div className="flex items-center justify-between p-2 rounded bg-[#101010] border border-[#262626]">
-              <span className="text-xs text-[#A3A3A3]">
+            <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+              <span className="text-xs text-slate-400">
                 {profileVar === 'TEMP' ? 'Temperature' : profileVar === 'SAL' ? 'Salinity' : 'Chlorophyll-a'}
               </span>
-              <span className="font-mono font-bold text-[#F5C518] text-sm">
+              <span className="font-mono font-bold text-cyan-300 text-sm">
                 {profileVar === 'TEMP'
-                  ? formatVal(selectedProbePoint.currentValue.temp, ' °C')
+                  ? formatVal(selectedProbePoint.currentValue.temp, '°C')
                   : profileVar === 'SAL'
-                  ? formatVal(selectedProbePoint.currentValue.sal, ' PSU')
-                  : formatVal(selectedProbePoint.currentValue.chla, ' mg/m³')}
+                  ? formatVal(selectedProbePoint.currentValue.sal, 'PSU')
+                  : formatVal(selectedProbePoint.currentValue.chla, 'mg/m³')}
               </span>
             </div>
           </div>
 
-          {/* Action Button */}
-          <button
-            onClick={handleCopyProbeData}
-            className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-medium bg-[#161616] hover:bg-[#1e1e1e] text-[#F5F5F5] border border-[#262626] hover:border-[#F5C518] transition-colors cursor-pointer"
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-[#F5C518]" /> : <Copy className="w-3.5 h-3.5 text-[#A3A3A3]" />}
-            <span>{copied ? 'Copied to Clipboard' : 'Copy Sounding Coordinates'}</span>
-          </button>
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <button
+              onClick={handleCopyProbeData}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all cursor-pointer"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-cyan-400" />}
+              <span>{copied ? 'Copied' : 'Copy Sounding'}</span>
+            </button>
+          </div>
         </div>
       ) : (
         /* 3. DEFAULT BASIN-WIDE OVERVIEW */
-        <div className="flex flex-col p-3.5 space-y-3.5">
+        <div className="flex flex-col p-4 space-y-4">
           <div>
-            <span className="text-[11px] font-semibold text-[#A3A3A3] uppercase tracking-wider block">
-              Observational Array
+            <span className="text-xs font-mono text-cyan-400 font-semibold block uppercase">
+              INCOIS Indian Ocean Array
             </span>
-            <h2 className="text-sm font-semibold text-[#F5F5F5] mt-0.5">
-              Indian Ocean In-Situ Network
+            <h2 className="text-base font-bold text-slate-100 mt-0.5">
+              Observational Array Overview
             </h2>
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="bg-[#161616] p-2.5 rounded-md border border-[#262626]">
-              <span className="text-[10px] text-[#666666] block">Active Floats</span>
-              <span className="text-lg font-mono font-semibold text-[#F5F5F5]">
+            <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-slate-400 block">Active Floats</span>
+              <span className="text-lg font-mono font-bold text-emerald-400">
                 {allFloats.length}
               </span>
-              <span className="text-[10px] text-[#A3A3A3] block mt-0.5">INCOIS Array</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5">MoES / INCOIS Network</span>
             </div>
-            <div className="bg-[#161616] p-2.5 rounded-md border border-[#262626]">
-              <span className="text-[10px] text-[#666666] block">High Anomaly Floats</span>
-              <span className="text-lg font-mono font-semibold text-[#F5C518]">
+            <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-slate-400 block">High Anomaly Floats</span>
+              <span className="text-lg font-mono font-bold text-amber-400">
                 {basinStats.highDiscrepancyCount}
               </span>
-              <span className="text-[10px] text-[#A3A3A3] block mt-0.5">|Δ| &gt; {state.variable === 'CHLA' ? '0.5' : '1.0'}</span>
+              <span className="text-[10px] text-slate-500 block mt-0.5">|Δ| &gt; {state.variable === 'CHLA' ? '0.5' : '1.0'}</span>
             </div>
           </div>
 
-          <div className="p-3 bg-[#161616] rounded-md border border-[#262626] text-xs text-[#A3A3A3] space-y-1">
-            <div className="flex items-center gap-1.5 text-[#F5F5F5] font-medium">
-              <MapPin className="w-3.5 h-3.5 text-[#F5C518]" />
-              <span>Interactive Float Soundings</span>
+          <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs text-slate-400 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-slate-300 font-semibold">
+              <MapPin className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Interactive In-Situ Soundings</span>
             </div>
-            <p className="text-[11px] text-[#666666] leading-relaxed">
-              Click any Argo float marker on the 3D globe or select a platform below to inspect vertical soundings and compare live in-situ observations against numerical models.
+            <p className="text-[11px] leading-relaxed">
+              Click any Argo float marker on the 3D globe or click on the ocean surface to inspect vertical sounding curves, CTD profiles, and compare live in-situ observations against INCOIS numerical model fields.
             </p>
-          </div>
-
-          {/* List of all Argo Floats for quick selection */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-[#A3A3A3] font-medium">All Argo Floats ({allFloats.length})</span>
-              <span className="text-[10px] text-[#666666] font-mono">Select to inspect</span>
-            </div>
-            <div className="grid grid-cols-1 gap-1 max-h-48 overflow-y-auto custom-scrollbar pr-0.5">
-              {allFloats.map((fl) => {
-                const profile = fl.profiles.find((p) => p.depth === state.depth) || fl.profiles[0];
-                const delta =
-                  state.variable === 'TEMP'
-                    ? profile.tempDelta
-                    : state.variable === 'SAL'
-                    ? profile.salDelta
-                    : profile.chlaDelta || 0;
-
-                return (
-                  <button
-                    key={fl.id}
-                    id={`btn-overview-select-float-${fl.platformNumber}`}
-                    onClick={() => onSelectFloat(fl.id)}
-                    className="w-full text-left p-2 rounded bg-[#161616] hover:bg-[#1f1f1f] border border-[#262626] hover:border-[#404040] transition-colors flex items-center justify-between group cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#666666] group-hover:bg-[#F5C518]" />
-                      <div>
-                        <span className="font-mono font-medium text-[#F5F5F5] text-xs">
-                          Argo {fl.platformNumber}
-                        </span>
-                        <span className="text-[10px] text-[#666666] ml-1.5">
-                          {fl.basin}
-                        </span>
-                      </div>
-                    </div>
-                    <span
-                      className={`text-[10px] font-mono ${
-                        Math.abs(delta) > 1.0 ? 'text-[#F5C518]' : 'text-[#666666]'
-                      }`}
-                    >
-                      Δ {delta > 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
           <button
             onClick={() => downloadArgoCsv()}
-            className="flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-medium bg-[#161616] hover:bg-[#1e1e1e] text-[#F5F5F5] border border-[#262626] hover:border-[#F5C518] transition-colors cursor-pointer"
+            className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-all cursor-pointer shadow-md"
           >
-            <Download className="w-3.5 h-3.5 text-[#F5C518]" />
+            <Download className="w-3.5 h-3.5" />
             <span>Download Full Argo Dataset (CSV)</span>
           </button>
         </div>
