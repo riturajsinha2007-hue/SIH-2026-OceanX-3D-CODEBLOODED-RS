@@ -24,34 +24,23 @@ function createFloatMarkerIcon(
   isSelected: boolean,
   isHovered: boolean
 ): string {
-  const size = isSelected ? 48 : isHovered ? 40 : 32;
-  const radius = isSelected ? 8 : 6;
+  const size = isSelected ? 40 : isHovered ? 34 : 26;
+  const radius = isSelected ? 7 : 5;
   const center = size / 2;
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <defs>
-        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="${isSelected ? 3 : 2}" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-      
-      <!-- Outer radar ring for selected / hovered float -->
+      <!-- Outer ring for selected / hovered float -->
       ${
         isSelected || isHovered
-          ? `<circle cx="${center}" cy="${center}" r="${center - 4}" fill="none" stroke="${colorHex}" stroke-width="1.5" stroke-dasharray="3,2" opacity="0.8" />
-             <circle cx="${center}" cy="${center}" r="${center - 9}" fill="${colorHex}" fill-opacity="0.15" />`
+          ? `<circle cx="${center}" cy="${center}" r="${center - 3}" fill="none" stroke="${colorHex}" stroke-width="1.5" stroke-dasharray="2,2" opacity="0.9" />`
           : ''
       }
       
       <!-- Core beacon -->
-      <circle cx="${center}" cy="${center}" r="${radius + 2}" fill="#040810" stroke="#0f172a" stroke-width="1" />
-      <circle cx="${center}" cy="${center}" r="${radius}" fill="${colorHex}" filter="url(#glow)" />
-      <circle cx="${center}" cy="${center}" r="${Math.max(2, radius - 3.5)}" fill="#ffffff" opacity="0.9" />
+      <circle cx="${center}" cy="${center}" r="${radius + 1}" fill="#101010" stroke="#262626" stroke-width="1" />
+      <circle cx="${center}" cy="${center}" r="${radius}" fill="${colorHex}" />
+      <circle cx="${center}" cy="${center}" r="${Math.max(1.5, radius - 3)}" fill="#ffffff" opacity="0.9" />
     </svg>
   `;
 
@@ -60,31 +49,21 @@ function createFloatMarkerIcon(
 
 // Generate animated crosshair probe target icon
 function createProbeTargetIcon(): string {
-  const size = 56;
+  const size = 48;
   const center = size / 2;
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <defs>
-        <filter id="probeGlow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="3" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-      <!-- Outer dashed radar rings -->
-      <circle cx="${center}" cy="${center}" r="${center - 4}" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="4,3" opacity="0.9" />
-      <circle cx="${center}" cy="${center}" r="${center - 11}" fill="#0284c7" fill-opacity="0.25" stroke="#38bdf8" stroke-width="1.2" />
+      <!-- Outer radar rings -->
+      <circle cx="${center}" cy="${center}" r="${center - 4}" fill="none" stroke="#F5C518" stroke-width="1.4" stroke-dasharray="3,2" opacity="0.8" />
       
       <!-- Crosshair reticle lines -->
-      <line x1="${center}" y1="2" x2="${center}" y2="${center - 6}" stroke="#38bdf8" stroke-width="2" />
-      <line x1="${center}" y1="${center + 6}" x2="${size - 2}" stroke="#38bdf8" stroke-width="2" />
-      <line x1="2" y1="${center}" x2="${center - 6}" y2="${center}" stroke="#38bdf8" stroke-width="2" />
-      <line x1="${center + 6}" y1="${center}" x2="${size - 2}" stroke="#38bdf8" stroke-width="2" />
+      <line x1="${center}" y1="2" x2="${center}" y2="${center - 5}" stroke="#F5C518" stroke-width="1.5" />
+      <line x1="${center}" y1="${center + 5}" x2="${size - 2}" stroke="#F5C518" stroke-width="1.5" />
+      <line x1="2" y1="${center}" x2="${center - 5}" y2="${center}" stroke="#F5C518" stroke-width="1.5" />
+      <line x1="${center + 5}" y1="${center}" x2="${size - 2}" stroke="#F5C518" stroke-width="1.5" />
       
-      <!-- Center Glowing Pin -->
-      <circle cx="${center}" cy="${center}" r="4.5" fill="#f59e0b" filter="url(#probeGlow)" stroke="#ffffff" stroke-width="1.5" />
+      <!-- Center Pin -->
+      <circle cx="${center}" cy="${center}" r="3.5" fill="#F5C518" stroke="#101010" stroke-width="1.5" />
     </svg>
   `;
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg.trim());
@@ -171,9 +150,12 @@ export const OceanGlobe: React.FC<OceanGlobeProps> = ({
     }));
 
     const datasetId = variable === 'CHLA' ? 'incois_oceansat2_datasets' : 'incois_argo_mnt_VAM';
-    const bounds = variable === 'CHLA'
-      ? { latMin: 0.5, latMax: 27.5, lonMin: 47.0, lonMax: 99.0 }
-      : { latMin: GRID_METADATA.latMin, latMax: GRID_METADATA.latMax, lonMin: GRID_METADATA.lonMin, lonMax: GRID_METADATA.lonMax };
+    const bounds = {
+      latMin: GRID_METADATA.latMin,
+      latMax: GRID_METADATA.latMax,
+      lonMin: GRID_METADATA.lonMin,
+      lonMax: GRID_METADATA.lonMax,
+    };
 
     const currentSelection: DataSelection = {
       datasetId,
@@ -379,8 +361,8 @@ export const OceanGlobe: React.FC<OceanGlobeProps> = ({
         });
 
         // Set high quality visual environment
-        viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#040810');
-        viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#061221');
+        viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#080808');
+        viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0c0c0c');
         viewer.scene.globe.depthTestAgainstTerrain = false;
         viewer.scene.globe.enableLighting = false;
 
@@ -407,7 +389,7 @@ export const OceanGlobe: React.FC<OceanGlobeProps> = ({
         // Domain boundaries (30°E - 120°E, -35°S - 30°N)
         const { lonMin, lonMax, latMin, latMax } = GRID_METADATA;
 
-        // Glowing Scientific Bounding Barrier Perimeter
+        // Scientific Bounding Barrier Perimeter
         viewer.entities.add({
           name: 'INCOIS Domain Barrier Line',
           polyline: {
@@ -418,38 +400,36 @@ export const OceanGlobe: React.FC<OceanGlobeProps> = ({
               lonMin, latMax,
               lonMin, latMin,
             ]),
-            width: 2.5,
-            material: new Cesium.PolylineGlowMaterialProperty({
-              glowPower: 0.25,
-              taperPower: 1.0,
-              color: Cesium.Color.fromCssColorString('#06b6d4'),
-            }),
+            width: 1.5,
+            material: new Cesium.ColorMaterialProperty(
+              Cesium.Color.fromCssColorString('#404040')
+            ),
             clampToGround: true,
           },
         });
 
         // Corner barrier coordinate tags
         const cornerTags = [
-          { lon: lonMin, lat: latMax, label: `NW Boundary [${lonMin}°E, ${latMax}°N]` },
-          { lon: lonMax, lat: latMax, label: `NE Boundary [${lonMax}°E, ${latMax}°N]` },
-          { lon: lonMin, lat: latMin, label: `SW Boundary [${lonMin}°E, ${Math.abs(latMin)}°S]` },
-          { lon: lonMax, lat: latMin, label: `SE Boundary [${lonMax}°E, ${Math.abs(latMin)}°S]` },
+          { lon: lonMin, lat: latMax, label: `NW [${lonMin}°E, ${latMax}°N]` },
+          { lon: lonMax, lat: latMax, label: `NE [${lonMax}°E, ${latMax}°N]` },
+          { lon: lonMin, lat: latMin, label: `SW [${lonMin}°E, ${Math.abs(latMin)}°S]` },
+          { lon: lonMax, lat: latMin, label: `SE [${lonMax}°E, ${Math.abs(latMin)}°S]` },
         ];
         cornerTags.forEach((tag, idx) => {
           viewer.entities.add({
             id: `domain-barrier-tag-${idx}`,
             position: Cesium.Cartesian3.fromDegrees(tag.lon, tag.lat, 100),
             point: {
-              pixelSize: 6,
-              color: Cesium.Color.fromCssColorString('#22d3ee'),
-              outlineColor: Cesium.Color.fromCssColorString('#040810'),
-              outlineWidth: 2,
+              pixelSize: 4,
+              color: Cesium.Color.fromCssColorString('#F5C518'),
+              outlineColor: Cesium.Color.fromCssColorString('#080808'),
+              outlineWidth: 1,
             },
             label: {
               text: tag.label,
-              font: '10px monospace',
-              fillColor: Cesium.Color.fromCssColorString('#38bdf8'),
-              outlineColor: Cesium.Color.fromCssColorString('#020617'),
+              font: '9px monospace',
+              fillColor: Cesium.Color.fromCssColorString('#A3A3A3'),
+              outlineColor: Cesium.Color.fromCssColorString('#080808'),
               outlineWidth: 2,
               style: Cesium.LabelStyle.FILL_AND_OUTLINE,
               pixelOffset: new Cesium.Cartesian2(0, tag.lat < 0 ? 16 : -16),
@@ -953,7 +933,10 @@ export const OceanGlobe: React.FC<OceanGlobeProps> = ({
     if (!state.showArgo) return;
 
     filteredFloats.forEach((float) => {
-      const isSelected = state.selectedFloatId === float.id;
+      const isSelected =
+        state.selectedFloatId === float.id ||
+        state.selectedFloatId === float.platformNumber ||
+        state.selectedFloatId === `argo-${float.platformNumber}`;
       const isHovered = hoveredFloat?.id === float.id;
       const profile = float.profiles.find((p) => p.depth === state.depth) || float.profiles[0];
       const delta =
@@ -965,23 +948,26 @@ export const OceanGlobe: React.FC<OceanGlobeProps> = ({
       const absDelta = Math.abs(delta);
 
       // Color code by anomaly / discrepancy
-      let beaconColorHex = '#10b981'; // Emerald (Well Matched)
+      let beaconColorHex = '#F5C518'; // Warm Yellow Default
       const highThresh = state.variable === 'CHLA' ? 1.0 : 1.5;
-      const modThresh = state.variable === 'CHLA' ? 0.3 : 0.5;
 
       if (absDelta >= highThresh) {
-        beaconColorHex = '#f43f5e'; // Rose (High Divergence)
-      } else if (absDelta >= modThresh) {
-        beaconColorHex = '#f59e0b'; // Amber (Moderate Divergence)
+        beaconColorHex = '#F5C518';
       }
 
       if (isSelected) {
-        beaconColorHex = '#38bdf8'; // Cyan Selected
+        beaconColorHex = '#F5C518'; // Yellow Selected
       }
 
       const iconUri = createFloatMarkerIcon(beaconColorHex, isSelected, isHovered);
+      const unit = state.variable === 'TEMP' ? '°C' : state.variable === 'SAL' ? 'PSU' : 'mg/m³';
+      const labelText = isSelected
+        ? `▶ Argo ${float.platformNumber} (Δ ${delta > 0 ? '+' : ''}${delta.toFixed(2)}${unit})`
+        : isHovered
+        ? `● Argo ${float.platformNumber}`
+        : `Argo ${float.platformNumber}`;
 
-      // Add float billboard entity
+      // Add float billboard entity with permanently visible, crisp Argo Float name label
       const entity = viewer.entities.add({
         id: float.id,
         name: `Argo ${float.platformNumber}`,
@@ -993,18 +979,31 @@ export const OceanGlobe: React.FC<OceanGlobeProps> = ({
           horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
-        label: isSelected
-          ? {
-              text: `WMO ${float.platformNumber} (Δ ${delta > 0 ? '+' : ''}${delta.toFixed(2)})`,
-              font: 'bold 11px monospace',
-              fillColor: Cesium.Color.fromCssColorString('#38bdf8'),
-              outlineColor: Cesium.Color.fromCssColorString('#040810'),
-              outlineWidth: 3,
-              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-              pixelOffset: new Cesium.Cartesian2(0, -26),
-              disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            }
-          : undefined,
+        label: {
+          text: labelText,
+          font: isSelected
+            ? 'bold 11px "JetBrains Mono", monospace'
+            : isHovered
+            ? 'bold 10px "JetBrains Mono", monospace'
+            : '9px "JetBrains Mono", monospace',
+          fillColor: isSelected
+            ? Cesium.Color.fromCssColorString('#F5C518')
+            : isHovered
+            ? Cesium.Color.fromCssColorString('#F5F5F5')
+            : Cesium.Color.fromCssColorString('#A3A3A3'),
+          outlineColor: Cesium.Color.fromCssColorString('#080808'),
+          outlineWidth: isSelected ? 3 : 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          pixelOffset: new Cesium.Cartesian2(0, isSelected ? -20 : isHovered ? -18 : -15),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          showBackground: true,
+          backgroundColor: isSelected
+            ? Cesium.Color.fromCssColorString('rgba(16, 16, 16, 0.95)')
+            : isHovered
+            ? Cesium.Color.fromCssColorString('rgba(16, 16, 16, 0.9)')
+            : Cesium.Color.fromCssColorString('rgba(16, 16, 16, 0.75)'),
+          backgroundPadding: new Cesium.Cartesian2(4, 2),
+        },
         properties: {
           type: 'argo-float',
           floatId: float.id,
@@ -1026,11 +1025,10 @@ export const OceanGlobe: React.FC<OceanGlobeProps> = ({
         const trackEntity = viewer.entities.add({
           polyline: {
             positions: driftPoints,
-            width: 2.5,
-            material: new Cesium.PolylineGlowMaterialProperty({
-              glowPower: 0.2,
-              color: Cesium.Color.fromCssColorString('#38bdf8'),
-            }),
+            width: 2.0,
+            material: new Cesium.ColorMaterialProperty(
+              Cesium.Color.fromCssColorString('#F5C518')
+            ),
           },
         });
         trackEntitiesRef.current.push(trackEntity);
@@ -1146,7 +1144,7 @@ export const OceanGlobe: React.FC<OceanGlobeProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full overflow-hidden select-none bg-[#040810]">
+    <div className="relative w-full h-full overflow-hidden select-none bg-[#080808]">
       {/* Cesium Container */}
       <div
         id="cesiumContainer"
@@ -1155,30 +1153,30 @@ export const OceanGlobe: React.FC<OceanGlobeProps> = ({
       />
 
       {/* Floating HUD Controls (Top-Right) */}
-      <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 bg-slate-900/85 backdrop-blur-md p-1.5 rounded-xl border border-slate-700/80 shadow-2xl">
+      <div className="absolute top-4 right-4 z-20 flex flex-col gap-1.5 bg-[#101010] p-1 rounded-md border border-[#262626] shadow-xl">
         <button
           id="btn-recenter-cesium"
           onClick={handleRecenter}
           title="Recenter Indian Ocean Basin (78°E, 6°N)"
-          className="p-2 rounded-lg text-slate-300 hover:text-cyan-300 hover:bg-slate-800 transition-all flex items-center justify-center group cursor-pointer"
+          className="p-1.5 rounded text-[#A3A3A3] hover:text-[#F5F5F5] hover:bg-[#161616] transition-colors flex items-center justify-center cursor-pointer"
         >
-          <RotateCcw className="w-4 h-4 group-hover:-rotate-45 transition-transform" />
+          <RotateCcw className="w-3.5 h-3.5" />
         </button>
         <button
           id="btn-zoom-in-cesium"
           onClick={() => handleZoom('in')}
           title="Zoom In"
-          className="p-2 rounded-lg text-slate-300 hover:text-cyan-300 hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+          className="p-1.5 rounded text-[#A3A3A3] hover:text-[#F5F5F5] hover:bg-[#161616] transition-colors flex items-center justify-center cursor-pointer"
         >
-          <ZoomIn className="w-4 h-4" />
+          <ZoomIn className="w-3.5 h-3.5" />
         </button>
         <button
           id="btn-zoom-out-cesium"
           onClick={() => handleZoom('out')}
           title="Zoom Out"
-          className="p-2 rounded-lg text-slate-300 hover:text-cyan-300 hover:bg-slate-800 transition-all flex items-center justify-center cursor-pointer"
+          className="p-1.5 rounded text-[#A3A3A3] hover:text-[#F5F5F5] hover:bg-[#161616] transition-colors flex items-center justify-center cursor-pointer"
         >
-          <ZoomOut className="w-4 h-4" />
+          <ZoomOut className="w-3.5 h-3.5" />
         </button>
       </div>
 
@@ -1186,283 +1184,125 @@ export const OceanGlobe: React.FC<OceanGlobeProps> = ({
       {state.selectedProbePoint && (
         <div
           id="globe-probe-quick-card"
-          className="absolute top-4 left-4 z-20 bg-slate-900/95 backdrop-blur-md border border-amber-500/60 rounded-xl p-3.5 shadow-2xl text-xs space-y-2.5 max-w-[280px]"
+          className="absolute top-4 left-4 z-20 bg-[#101010] border border-[#262626] rounded-md p-3 shadow-2xl text-xs space-y-2 max-w-[260px] text-[#F5F5F5]"
         >
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <div className="flex items-center gap-1.5 text-amber-400 font-semibold">
-              <Target className="w-4 h-4" />
+          <div className="flex items-center justify-between border-b border-[#262626] pb-1.5">
+            <div className="flex items-center gap-1.5 text-[#F5C518] font-semibold text-[11px]">
+              <Target className="w-3.5 h-3.5" />
               <span>POINT OCEAN PROBE</span>
             </div>
             <button
               id="btn-dismiss-globe-probe"
               onClick={() => onSelectProbePoint(null)}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-1 rounded text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="space-y-1">
-            <div className="text-slate-200 font-bold text-sm">
+          <div className="space-y-0.5">
+            <div className="text-[#F5F5F5] font-semibold text-xs">
               {state.selectedProbePoint.basin}
             </div>
-            <div className="text-slate-400 font-mono text-[11px] flex items-center justify-between">
-              <span>Pos: {state.selectedProbePoint.latitude >= 0 ? `${state.selectedProbePoint.latitude.toFixed(2)}°N` : `${Math.abs(state.selectedProbePoint.latitude).toFixed(2)}°S`}, {state.selectedProbePoint.longitude >= 0 ? `${state.selectedProbePoint.longitude.toFixed(2)}°E` : `${Math.abs(state.selectedProbePoint.longitude).toFixed(2)}°W`}</span>
-              <span className="text-cyan-300 font-semibold">
-                {state.variable === 'CHLA' ? 'Layer: Surface (0–5m)' : `Layer: ${state.depth}m`}
+            <div className="text-[#A3A3A3] font-mono text-[10px] flex items-center justify-between">
+              <span>{state.selectedProbePoint.latitude >= 0 ? `${state.selectedProbePoint.latitude.toFixed(2)}°N` : `${Math.abs(state.selectedProbePoint.latitude).toFixed(2)}°S`}, {state.selectedProbePoint.longitude >= 0 ? `${state.selectedProbePoint.longitude.toFixed(2)}°E` : `${Math.abs(state.selectedProbePoint.longitude).toFixed(2)}°W`}</span>
+              <span className="text-[#F5C518]">
+                {state.variable === 'CHLA' ? 'Surface (0–5m)' : `${state.depth}m`}
               </span>
             </div>
           </div>
 
           {state.selectedProbePoint.isLand ? (
-            <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px]">
-              Continental Landmass (Outside Ocean Grid)
+            <div className="p-1.5 rounded bg-[#161616] border border-[#262626] text-[#A3A3A3] text-[10px]">
+              Landmass (Outside Ocean Grid)
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center font-mono">
-              <div className="bg-slate-950/70 p-1.5 rounded-lg border border-slate-800">
-                <span className="text-[9px] text-slate-400 block">SST/Temp</span>
-                <span className="text-amber-400 font-bold text-[11px]">
-                  {!isNaN(state.selectedProbePoint.currentValue.temp) ? `${state.selectedProbePoint.currentValue.temp.toFixed(2)}°C` : 'N/A'}
+            <div className="grid grid-cols-3 gap-1 pt-1 text-center font-mono">
+              <div className="bg-[#161616] p-1.5 rounded border border-[#262626]">
+                <span className="text-[9px] text-[#666666] block">Temp</span>
+                <span className="text-[#F5F5F5] font-bold text-[10px]">
+                  {!isNaN(state.selectedProbePoint.currentValue.temp) ? `${state.selectedProbePoint.currentValue.temp.toFixed(1)}°C` : '—'}
                 </span>
               </div>
-              <div className="bg-slate-950/70 p-1.5 rounded-lg border border-slate-800">
-                <span className="text-[9px] text-slate-400 block">Salinity</span>
-                <span className="text-cyan-400 font-bold text-[11px]">
-                  {!isNaN(state.selectedProbePoint.currentValue.sal) ? `${state.selectedProbePoint.currentValue.sal.toFixed(2)}` : 'N/A'}
+              <div className="bg-[#161616] p-1.5 rounded border border-[#262626]">
+                <span className="text-[9px] text-[#666666] block">Sal</span>
+                <span className="text-[#F5F5F5] font-bold text-[10px]">
+                  {!isNaN(state.selectedProbePoint.currentValue.sal) ? `${state.selectedProbePoint.currentValue.sal.toFixed(1)}` : '—'}
                 </span>
               </div>
-              <div className="bg-slate-950/70 p-1.5 rounded-lg border border-slate-800">
-                <span className="text-[9px] text-slate-400 block">Chl-a</span>
-                <span className="text-emerald-400 font-bold text-[11px]">
-                  {!isNaN(state.selectedProbePoint.currentValue.chla) ? `${state.selectedProbePoint.currentValue.chla.toFixed(3)}` : 'No Data'}
+              <div className="bg-[#161616] p-1.5 rounded border border-[#262626]">
+                <span className="text-[9px] text-[#666666] block">Chl</span>
+                <span className="text-[#F5C518] font-bold text-[10px]">
+                  {!isNaN(state.selectedProbePoint.currentValue.chla) ? `${state.selectedProbePoint.currentValue.chla.toFixed(2)}` : '—'}
                 </span>
               </div>
-            </div>
-          )}
-
-          {state.selectedProbePoint.nearestFloat && (
-            <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800">
-              <span>Nearest Float:</span>
-              <span className="text-slate-300 font-semibold">
-                WMO #{state.selectedProbePoint.nearestFloat.float.platformNumber} ({state.selectedProbePoint.nearestFloat.distanceKm} km)
-              </span>
             </div>
           )}
         </div>
       )}
 
-      {/* Dynamic ERDDAP Dataset Status & Provenance HUD Banner */}
+      {/* Dynamic Dataset Status HUD Banner */}
       <div
         id="dataset-provenance-banner"
         onClick={() => setIsProvenanceModalOpen(true)}
-        className={`absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2.5 bg-slate-900/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl border text-xs shadow-2xl transition-all cursor-pointer hover:bg-slate-800/95 ${
-          validationResult?.state === 'VERIFIED'
-            ? 'border-emerald-500/60 shadow-emerald-950/40'
-            : validationResult?.state === 'CACHED'
-            ? 'border-amber-500/60 shadow-amber-950/40'
-            : validationResult?.state === 'VALIDATION_FAILED'
-            ? 'border-red-500/80 shadow-red-950/50'
-            : sliceFetchStatus.loading
-            ? 'border-amber-500/60 shadow-amber-950/40'
-            : 'border-cyan-500/50 shadow-cyan-950/30'
-        }`}
-        title="Click to view full Scientific Data Provenance & Double-Verification Quality Gate Audit"
+        className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-[#101010] px-3 py-1.5 rounded-md border border-[#262626] text-xs shadow-xl transition-all cursor-pointer hover:border-[#404040]"
+        title="Click to view data provenance"
       >
-        <div
-          className={`w-2.5 h-2.5 rounded-full ${
-            sliceFetchStatus.loading
-              ? 'bg-amber-400 animate-ping'
-              : validationResult?.state === 'VERIFIED'
-              ? 'bg-emerald-400 animate-pulse'
-              : validationResult?.state === 'CACHED'
-              ? 'bg-amber-400'
-              : validationResult?.state === 'VALIDATION_FAILED'
-              ? 'bg-red-400'
-              : 'bg-cyan-400'
-          }`}
-        />
-        <div className="font-mono text-slate-200 flex items-center gap-2">
-          <span
-            className={`font-semibold ${
-              state.variable === 'CHLA' ? 'text-emerald-400' : 'text-cyan-400'
-            }`}
-          >
-            {state.variable === 'CHLA'
-              ? 'incois_oceansat2_datasets'
-              : 'incois_argo_mnt_VAM'}
-            :
+        <div className="w-2 h-2 rounded-full bg-[#F5C518]" />
+        <div className="font-mono text-[#F5F5F5] flex items-center gap-1.5 text-[11px]">
+          <span className="text-[#A3A3A3]">
+            {state.variable === 'CHLA' ? 'incois_oceansat2' : 'incois_argo_VAM'}
           </span>
-          <span className="text-slate-300">
-            {state.variable === 'TEMP'
-              ? 'TEMP (°C)'
-              : state.variable === 'SAL'
-              ? 'SAL (PSU)'
-              : 'CHL (mg/m³)'}
-          </span>
-          <span className="text-slate-500">•</span>
-          <span className="text-slate-100 font-semibold">{sliceFetchStatus.timeStr}</span>
+          <span className="text-[#666666]">•</span>
+          <span className="text-[#F5F5F5] font-semibold">{sliceFetchStatus.timeStr}</span>
           {state.variable !== 'CHLA' && (
             <>
-              <span className="text-slate-500">•</span>
-              <span className="text-amber-300 font-semibold">{state.depth}m</span>
+              <span className="text-[#666666]">•</span>
+              <span className="text-[#F5C518] font-semibold">{state.depth}m</span>
             </>
           )}
-          <span
-            className={`text-[10px] px-2 py-0.5 rounded font-sans flex items-center gap-1 ${
-              sliceFetchStatus.loading
-                ? 'bg-amber-950/80 text-amber-300 border border-amber-800/60'
-                : validationResult?.state === 'VERIFIED'
-                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/60'
-                : validationResult?.state === 'CACHED'
-                ? 'bg-amber-950 text-amber-300 border border-amber-800/60'
-                : validationResult?.state === 'VALIDATION_FAILED'
-                ? 'bg-red-950 text-red-300 border border-red-800/60'
-                : 'bg-slate-800 text-cyan-300 border border-slate-700'
-            }`}
-          >
-            {sliceFetchStatus.loading ? (
-              <>
-                <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-                <span>Validating ERDDAP...</span>
-              </>
-            ) : validationResult?.state === 'VERIFIED' ? (
-              <>
-                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                <span>🟢 Verified</span>
-              </>
-            ) : validationResult?.state === 'CACHED' ? (
-              <span>🟡 Cached</span>
-            ) : validationResult?.state === 'VALIDATION_FAILED' ? (
-              <>
-                <AlertTriangle className="w-3 h-3 text-red-400" />
-                <span>🔴 Validation Failed</span>
-              </>
-            ) : (
-              <span>Live Synced Grid</span>
-            )}
-          </span>
         </div>
       </div>
 
-      {/* Strict Scientific Integrity Overlay: No Verified Data Available Banner */}
-      {validationResult && !validationResult.passed && !sliceFetchStatus.loading && (
-        <div
-          id="no-verified-data-alert"
-          className="absolute top-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-red-950/90 backdrop-blur-md border border-red-500/80 px-4 py-2.5 rounded-xl text-red-200 text-xs shadow-2xl animate-fade-in max-w-lg text-center"
-        >
-          <AlertOctagon className="w-5 h-5 text-red-400 shrink-0" />
-          <div className="text-left">
-            <div className="font-semibold text-red-100 flex items-center gap-1.5">
-              <span>No verified data available for this selection</span>
-            </div>
-            <div className="text-[11px] text-red-300/90 mt-0.5">
-              Layer rendering blocked to prevent unverified or extrapolated ocean state display.
-            </div>
-          </div>
-          <button
-            onClick={() => setIsProvenanceModalOpen(true)}
-            className="shrink-0 ml-auto px-2.5 py-1 rounded-lg bg-red-900/80 hover:bg-red-800 text-red-100 font-mono text-[10px] border border-red-700/60 transition-colors"
-          >
-            Audit Gate
-          </button>
+      {/* Telemetry Badge (Bottom-Left) */}
+      <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2.5 bg-[#101010] px-3 py-1.5 rounded-md border border-[#262626] text-xs shadow-xl pointer-events-none text-[#A3A3A3]">
+        <div className="flex items-center gap-1.5 text-[#F5F5F5] font-mono text-[11px]">
+          <Globe className="w-3.5 h-3.5 text-[#F5C518]" />
+          <span>INCOIS 3D</span>
         </div>
-      )}
-
-      {/* Floating Telemetry Badge (Bottom-Left) */}
-      <div className="absolute bottom-4 left-4 z-20 flex items-center gap-3 bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700/80 text-xs shadow-xl pointer-events-none">
-        <div className="flex items-center gap-1.5 text-cyan-400 font-mono font-semibold">
-          <Globe className="w-3.5 h-3.5 text-cyan-400 animate-spin-slow" />
-          <span>INCOIS 3D Cesium</span>
+        <div className="h-3 w-px bg-[#262626]" />
+        <div className="font-mono text-[10px]">
+          {cursorLatLon ? `${cursorLatLon.lat}, ${cursorLatLon.lon}` : '78.00°E, 6.00°N'}
         </div>
-        <div className="h-3 w-px bg-slate-700" />
-        <div className="flex items-center gap-1 text-cyan-300 font-mono text-[11px]">
-          <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Domain Barrier Clamped</span>
-        </div>
-        <div className="h-3 w-px bg-slate-700" />
-        <div className="text-slate-300 font-mono text-[11px]">
-          Cursor: {cursorLatLon ? `${cursorLatLon.lat}, ${cursorLatLon.lon}` : '78.00°E, 6.00°N'}
-        </div>
-        <div className="h-3 w-px bg-slate-700" />
-        <div className="text-slate-400 text-[11px]">
-          Active Floats: <span className="text-emerald-400 font-semibold">{filteredFloats.length}</span> / {ARGO_FLOATS.length}
+        <div className="h-3 w-px bg-[#262626]" />
+        <div className="text-[10px]">
+          Floats: <span className="text-[#F5C518] font-medium">{filteredFloats.length}</span>
         </div>
       </div>
 
       {/* Floating Hover Tooltip for Argo Float */}
       {hoveredFloat && (
         <div
-          className="absolute z-30 pointer-events-none bg-slate-900/95 backdrop-blur-md border border-cyan-500/50 rounded-xl p-3 shadow-2xl text-xs space-y-1.5 min-w-[220px]"
+          className="absolute z-30 pointer-events-none bg-[#101010] border border-[#262626] rounded-md p-2.5 shadow-2xl text-xs space-y-1 min-w-[200px] text-[#F5F5F5]"
           style={{
-            left: `${Math.min(mousePos.x + 15, window.innerWidth - 240)}px`,
-            top: `${Math.min(mousePos.y + 15, window.innerHeight - 180)}px`,
+            left: `${Math.min(mousePos.x + 15, window.innerWidth - 220)}px`,
+            top: `${Math.min(mousePos.y + 15, window.innerHeight - 160)}px`,
           }}
         >
-          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
-            <div className="flex items-center gap-1.5">
-              <Activity className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="font-bold text-cyan-300">WMO #{hoveredFloat.platformNumber}</span>
+          <div className="flex items-center justify-between border-b border-[#262626] pb-1">
+            <div className="flex items-center gap-1.5 font-semibold text-[#F5F5F5]">
+              <Activity className="w-3 h-3 text-[#F5C518]" />
+              <span>Argo {hoveredFloat.platformNumber}</span>
             </div>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-semibold">
-              QC: {hoveredFloat.qcFlag === 1 ? 'Passed' : 'Probable'}
+            <span className="text-[9px] px-1 py-0.2 rounded bg-[#161616] text-[#F5C518] font-mono border border-[#262626]">
+              {hoveredFloat.basin}
             </span>
           </div>
 
-          <div className="text-slate-400 text-[11px] space-y-0.5">
-            <div>Basin: <span className="text-slate-200">{hoveredFloat.basin}</span></div>
-            <div>Pos: <span className="text-slate-200 font-mono">{hoveredFloat.latitude.toFixed(2)}°N, {hoveredFloat.longitude.toFixed(2)}°E</span></div>
-            <div>Depth Layer: <span className="text-cyan-300 font-bold">{state.depth}m</span></div>
+          <div className="text-[#A3A3A3] text-[10px] space-y-0.5 font-mono">
+            <div>Pos: {hoveredFloat.latitude.toFixed(2)}°N, {hoveredFloat.longitude.toFixed(2)}°E</div>
+            <div>Depth: <span className="text-[#F5C518]">{state.depth}m</span></div>
           </div>
-
-          {(() => {
-            const profile = hoveredFloat.profiles.find((p) => p.depth === state.depth) || hoveredFloat.profiles[0];
-            const rawObs =
-              state.variable === 'TEMP'
-                ? profile?.observedTemp
-                : state.variable === 'SAL'
-                ? profile?.observedSal
-                : profile?.observedChla;
-            const rawMod =
-              state.variable === 'TEMP'
-                ? profile?.modelTemp
-                : state.variable === 'SAL'
-                ? profile?.modelSal
-                : profile?.modelChla;
-
-            const isObsFinite = typeof rawObs === 'number' && isFinite(rawObs) && !isNaN(rawObs);
-            const isModFinite = typeof rawMod === 'number' && isFinite(rawMod) && !isNaN(rawMod);
-            const isDeltaFinite = isObsFinite && isModFinite;
-            const delta = isDeltaFinite ? rawObs! - rawMod! : null;
-            const unit = state.variable === 'TEMP' ? '°C' : state.variable === 'SAL' ? 'PSU' : 'mg/m³';
-
-            return (
-              <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-                <div>
-                  <span className="text-slate-400">Obs:</span>{' '}
-                  <span className="text-emerald-400 font-mono font-semibold">
-                    {isObsFinite ? `${rawObs!.toFixed(2)}${unit}` : 'Data unavailable'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400">Model:</span>{' '}
-                  <span className="text-cyan-400 font-mono">
-                    {isModFinite ? `${rawMod!.toFixed(2)}${unit}` : 'Data unavailable'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400">Δ:</span>{' '}
-                  <span
-                    className={`font-mono font-bold ${
-                      isDeltaFinite && Math.abs(delta!) > 1.0 ? 'text-amber-400' : 'text-emerald-300'
-                    }`}
-                  >
-                    {isDeltaFinite ? `${delta! > 0 ? '+' : ''}${delta!.toFixed(2)}` : '—'}
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
         </div>
       )}
 

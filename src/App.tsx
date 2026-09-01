@@ -125,7 +125,7 @@ export default function App() {
   }, [state.selectedFloatId]);
 
   return (
-    <div id="oceanx-app-root" className="relative flex flex-col h-screen w-screen overflow-hidden bg-[#040810] text-slate-100 font-sans antialiased">
+    <div id="oceanx-app-root" className="relative flex flex-col h-full w-full overflow-hidden bg-[#040810] text-slate-100 font-sans antialiased">
       {/* 1. TOP NAVIGATION & STATUS BAR */}
       <TopBar
         state={state}
@@ -135,7 +135,7 @@ export default function App() {
       />
 
       {/* 2. MAIN SCIENTIFIC WORKSPACE (Left Controls + Center 3D Globe + Right Analysis) */}
-      <div className="relative flex-1 flex flex-row overflow-hidden w-full h-[calc(100vh-56px-56px)]">
+      <div className="relative flex-1 min-h-0 flex flex-row overflow-hidden w-full">
         {/* Left Side Controls */}
         <LeftControlPanel
           state={state}
@@ -145,7 +145,7 @@ export default function App() {
         />
 
         {/* Center 3D Globe Viewer (Unobstructed View) */}
-        <div className="relative flex-1 h-full w-full overflow-hidden bg-[#040810]">
+        <div className="relative flex-1 min-w-0 min-h-0 h-full w-full overflow-hidden bg-[#040810]">
           <OceanGlobe
             state={state}
             onSelectFloat={(id) => handleUpdateState({ selectedFloatId: id, selectedProbePoint: null })}
@@ -167,7 +167,7 @@ export default function App() {
           onChangeVariable={(v: OceanVariable) =>
             handleUpdateState({
               variable: v,
-              colormap: v === 'TEMP' ? 'thermal' : v === 'SAL' ? 'halite' : 'chlorophyll',
+              colormap: v === 'TEMP' ? 'thermal' : v === 'SAL' ? 'halite' : 'incois_rainbow',
             })
           }
         />

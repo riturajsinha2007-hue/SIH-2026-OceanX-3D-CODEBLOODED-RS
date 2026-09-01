@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ColormapType, DepthLevel, DiscrepancyThreshold, OceanVariable, VisualizationState, BasemapType, EdgeBlendMode } from '../../types/ocean';
 import { getColorCssGradient, getDefaultRange } from '../../utils/scientificColormaps';
+import { ARGO_FLOATS } from '../../data/incoisDataset';
 import {
   Thermometer,
   Droplet,
@@ -8,14 +9,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Sliders,
-  Database,
   Radio,
   Filter,
-  Sparkles,
   ExternalLink,
   Leaf,
   Blend,
-  Eye,
+  Search,
+  Navigation,
 } from 'lucide-react';
 
 interface LeftControlPanelProps {
@@ -40,30 +40,42 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [floatSearch, setFloatSearch] = useState('');
 
   const defaultRange = getDefaultRange(state.variable, state.depth);
+
+  const filteredFloatList = useMemo(() => {
+    if (!floatSearch.trim()) return ARGO_FLOATS;
+    const q = floatSearch.toLowerCase();
+    return ARGO_FLOATS.filter(
+      (f) =>
+        f.platformNumber.toLowerCase().includes(q) ||
+        f.basin.toLowerCase().includes(q) ||
+        `argo ${f.platformNumber}`.toLowerCase().includes(q)
+    );
+  }, [floatSearch]);
 
   return (
     <div
       id="left-control-panel"
-      className={`relative z-30 flex flex-col h-full bg-slate-900/90 backdrop-blur-xl border-r border-slate-700/60 shadow-2xl transition-all duration-300 ${
-        isCollapsed ? 'w-14' : 'w-80 md:w-88'
+      className={`relative z-30 flex flex-col h-full shrink-0 bg-[#101010] border-r border-[#262626] shadow-xl transition-all duration-200 select-none ${
+        isCollapsed ? 'w-12' : 'w-72 md:w-80 max-w-[85vw]'
       }`}
     >
       {/* Panel Collapse Toggle Tab */}
       <button
         id="btn-toggle-left-panel"
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3.5 top-6 z-40 bg-slate-800 border border-slate-600 text-slate-300 hover:text-cyan-400 p-1 rounded-full shadow-lg transition-colors cursor-pointer"
+        className="absolute -right-3 top-5 z-40 bg-[#161616] border border-[#262626] text-[#A3A3A3] hover:text-[#F5C518] p-1 rounded-full shadow-md transition-colors cursor-pointer"
         title={isCollapsed ? 'Expand Control Panel' : 'Collapse Panel'}
       >
-        {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
       </button>
 
       {isCollapsed ? (
-        <div className="flex flex-col items-center py-6 gap-6 text-slate-400">
-          <div className="p-2 rounded-xl bg-cyan-950/80 text-cyan-400 border border-cyan-800/60">
-            <Layers className="w-5 h-5" />
+        <div className="flex flex-col items-center py-4 gap-4 text-[#A3A3A3]">
+          <div className="p-1.5 rounded-md bg-[#161616] text-[#F5C518] border border-[#262626]">
+            <Layers className="w-4 h-4" />
           </div>
           <button
             onClick={() => {
@@ -73,211 +85,145 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
                 nextVar === 'TEMP' ? 'thermal' : nextVar === 'SAL' ? 'halite' : 'incois_rainbow';
               onChangeState({ variable: nextVar, colormap: nextCm });
             }}
-            className={`p-2 rounded-lg transition-colors cursor-pointer ${
+            className={`p-1.5 rounded-md transition-colors cursor-pointer border ${
               state.variable === 'TEMP'
-                ? 'text-amber-400 bg-amber-950/40'
+                ? 'text-[#F5C518] bg-[#161616] border-[#F5C518]'
                 : state.variable === 'SAL'
-                ? 'text-cyan-400 bg-cyan-950/40'
-                : 'text-emerald-400 bg-emerald-950/40'
+                ? 'text-[#F5C518] bg-[#161616] border-[#F5C518]'
+                : 'text-[#F5C518] bg-[#161616] border-[#F5C518]'
             }`}
             title={`Variable: ${state.variable}`}
           >
             {state.variable === 'TEMP' ? (
-              <Thermometer className="w-5 h-5" />
+              <Thermometer className="w-4 h-4" />
             ) : state.variable === 'SAL' ? (
-              <Droplet className="w-5 h-5" />
+              <Droplet className="w-4 h-4" />
             ) : (
-              <Leaf className="w-5 h-5" />
+              <Leaf className="w-4 h-4" />
             )}
           </button>
-          <div className="text-[10px] font-mono font-bold text-slate-300 rotate-90 my-4">
+          <div className="text-[10px] font-mono text-[#F5C518] rotate-90 my-2">
             {state.depth}m
           </div>
           <button
             onClick={() => onChangeState({ showArgo: !state.showArgo })}
-            className={`p-2 rounded-lg transition-colors cursor-pointer ${
-              state.showArgo ? 'text-emerald-400 bg-emerald-950/40' : 'text-slate-600'
+            className={`p-1.5 rounded-md transition-colors cursor-pointer border ${
+              state.showArgo ? 'text-[#F5C518] bg-[#161616] border-[#262626]' : 'text-[#666666] border-transparent'
             }`}
             title="Toggle Argo Floats"
           >
-            <Radio className="w-5 h-5" />
+            <Radio className="w-4 h-4" />
           </button>
         </div>
       ) : (
-        <div className="flex flex-col h-full overflow-y-auto custom-scrollbar p-4 space-y-4">
+        <div className="flex flex-col h-full overflow-y-auto custom-scrollbar p-3.5 space-y-3.5 text-[#F5F5F5]">
           {/* Header */}
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-cyan-950/80 text-cyan-400 border border-cyan-800/60">
-                <Layers className="w-4 h-4" />
-              </div>
-              <h2 className="text-sm font-semibold text-slate-100 tracking-wide uppercase">
-                Ocean Field Controls
-              </h2>
+          <div className="flex items-center justify-between pb-2 border-b border-[#262626]">
+            <h2 className="text-[11px] font-semibold text-[#A3A3A3] tracking-wider uppercase">
+              Data Controls
+            </h2>
+            <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#F5C518]">
+              <span>✓</span>
+              <span className="text-[#A3A3A3]">Verified</span>
             </div>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-              INCOIS ERDDAP
-            </span>
           </div>
 
           {/* 1. VARIABLE SELECTOR (TEMP, SAL, CHLA) */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center justify-between">
-              <span>Ocean Variable</span>
-              <span className="text-[11px] font-mono text-cyan-400 lowercase">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-medium text-[#A3A3A3]">
+                Variable
+              </label>
+              <span className="text-[10px] font-mono text-[#666666]">
                 {state.variable === 'TEMP'
                   ? 'temperature (°C)'
                   : state.variable === 'SAL'
                   ? 'salinity (PSU)'
-                  : 'chlorophyll-a (mg/m³)'}
+                  : 'chlorophyll (mg/m³)'}
               </span>
-            </label>
+            </div>
             <div className="grid grid-cols-3 gap-1.5">
               <button
                 id="btn-select-var-temp"
                 onClick={() => onChangeState({ variable: 'TEMP' })}
-                className={`flex flex-col items-center justify-center py-2 px-1.5 rounded-xl font-medium text-xs transition-all border cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2 px-1 rounded-md text-xs transition-colors border cursor-pointer ${
                   state.variable === 'TEMP'
-                    ? 'bg-amber-500/20 border-amber-500/80 text-amber-300 shadow-lg shadow-amber-950/50'
-                    : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                    ? 'bg-[#161616] border-[#F5C518] text-[#F5F5F5]'
+                    : 'bg-[#161616] border-[#262626] text-[#A3A3A3] hover:border-[#404040] hover:text-[#F5F5F5]'
                 }`}
               >
-                <Thermometer className="w-4 h-4 text-amber-400 mb-1" />
+                <Thermometer className={`w-3.5 h-3.5 mb-1 ${state.variable === 'TEMP' ? 'text-[#F5C518]' : 'text-[#A3A3A3]'}`} />
                 <span className="text-[11px]">Temperature</span>
               </button>
 
               <button
                 id="btn-select-var-sal"
                 onClick={() => onChangeState({ variable: 'SAL' })}
-                className={`flex flex-col items-center justify-center py-2 px-1.5 rounded-xl font-medium text-xs transition-all border cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2 px-1 rounded-md text-xs transition-colors border cursor-pointer ${
                   state.variable === 'SAL'
-                    ? 'bg-cyan-500/20 border-cyan-500/80 text-cyan-300 shadow-lg shadow-cyan-950/50'
-                    : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                    ? 'bg-[#161616] border-[#F5C518] text-[#F5F5F5]'
+                    : 'bg-[#161616] border-[#262626] text-[#A3A3A3] hover:border-[#404040] hover:text-[#F5F5F5]'
                 }`}
               >
-                <Droplet className="w-4 h-4 text-cyan-400 mb-1" />
+                <Droplet className={`w-3.5 h-3.5 mb-1 ${state.variable === 'SAL' ? 'text-[#F5C518]' : 'text-[#A3A3A3]'}`} />
                 <span className="text-[11px]">Salinity</span>
               </button>
 
               <button
                 id="btn-select-var-chla"
                 onClick={() => onChangeState({ variable: 'CHLA' })}
-                className={`flex flex-col items-center justify-center py-2 px-1.5 rounded-xl font-medium text-xs transition-all border cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2 px-1 rounded-md text-xs transition-colors border cursor-pointer ${
                   state.variable === 'CHLA'
-                    ? 'bg-emerald-500/20 border-emerald-500/80 text-emerald-300 shadow-lg shadow-emerald-950/50'
-                    : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                    ? 'bg-[#161616] border-[#F5C518] text-[#F5F5F5]'
+                    : 'bg-[#161616] border-[#262626] text-[#A3A3A3] hover:border-[#404040] hover:text-[#F5F5F5]'
                 }`}
               >
-                <Leaf className="w-4 h-4 text-emerald-400 mb-1" />
+                <Leaf className={`w-3.5 h-3.5 mb-1 ${state.variable === 'CHLA' ? 'text-[#F5C518]' : 'text-[#A3A3A3]'}`} />
                 <span className="text-[11px]">Chlorophyll</span>
               </button>
             </div>
-            {state.variable === 'CHLA' ? (
-              <div className="bg-emerald-950/40 border border-emerald-800/60 rounded-xl p-2.5 text-[11px] text-emerald-200/90 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-emerald-300">INCOIS Oceansat-2 (OCM-2)</span>
-                  <a
-                    href="https://erddap.incois.gov.in/erddap/griddap/incois_oceansat2_datasets.html"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[10px] font-mono bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 px-2 py-0.5 rounded border border-emerald-700/60 transition-colors"
-                    title="Open official INCOIS ERDDAP incois_oceansat2_datasets web interface"
-                  >
-                    <span>ERDDAP Portal</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                </div>
-                <div className="text-[10px] text-slate-300 flex items-center justify-between">
-                  <span>Dataset ID: <code className="text-emerald-400 font-mono">incois_oceansat2_datasets</code></span>
-                  <span className="text-[9px] text-emerald-300 bg-emerald-900/60 px-1.5 py-0.5 rounded font-mono">2011–2020 (3,377 Days)</span>
-                </div>
-                <div className="text-[10px] text-slate-300">
-                  Variable: <code className="text-emerald-400 font-mono">CHL</code> (mg/m³) • Optical Surface Layer
-                </div>
-                <div className="text-[9.5px] text-slate-400 font-mono truncate">
-                  Endpoint: erddap.incois.gov.in/erddap/griddap/incois_oceansat2_datasets
-                </div>
-              </div>
-            ) : (
-              <div className="bg-slate-900/80 border border-cyan-800/60 rounded-xl p-2.5 text-[11px] text-cyan-200/90 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-cyan-300">INCOIS ARGO Monthly VAM</span>
-                  <a
-                    href="https://erddap.incois.gov.in/erddap/griddap/incois_argo_mnt_VAM.html"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[10px] font-mono bg-cyan-950/80 hover:bg-cyan-900 text-cyan-200 px-2 py-0.5 rounded border border-cyan-700/60 transition-colors"
-                    title="Open official INCOIS ERDDAP incois_argo_mnt_VAM web interface"
-                  >
-                    <span>ERDDAP Portal</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                </div>
-                <div className="text-[10px] text-slate-300 flex items-center justify-between">
-                  <span>Dataset ID: <code className="text-cyan-400 font-mono">incois_argo_mnt_VAM</code></span>
-                  <span className="text-[9px] text-cyan-300 bg-cyan-950/80 px-1.5 py-0.5 rounded font-mono border border-cyan-800/50">2004–2026 (271 Months)</span>
-                </div>
-                <div className="text-[10px] text-slate-300 flex items-center justify-between">
-                  <span>Variable: <code className="text-amber-400 font-mono">{state.variable}</code> ({state.variable === 'TEMP' ? '°C' : 'PSU'})</span>
-                  <span className="text-slate-400 text-[10px]">24 Depths (5m–2000m)</span>
-                </div>
-                <div className="text-[9.5px] text-slate-400 font-mono truncate">
-                  Endpoint: erddap.incois.gov.in/erddap/griddap/incois_argo_mnt_VAM
-                </div>
-              </div>
-            )}
           </div>
 
           {/* 2. DEPTH CONTROLLER */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+              <label className="text-[11px] font-medium text-[#A3A3A3] uppercase tracking-wider">
                 Water Column Depth
               </label>
-              {state.variable === 'CHLA' ? (
-                <span className="text-[11px] font-mono font-bold text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">
-                  Surface (0–5m)
-                </span>
-              ) : (
-                <span className="text-xs font-mono font-bold text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/60">
-                  {state.depth} m
-                </span>
-              )}
+              <span className="text-[10px] font-mono text-[#F5C518]">
+                {state.variable === 'CHLA' ? 'Surface (0–5 m)' : `Surface (${state.depth} m)`}
+              </span>
             </div>
 
             {state.variable === 'CHLA' ? (
-              /* Informational notice for Chlorophyll surface-only constraint */
-              <div className="p-3 bg-slate-950/60 border border-emerald-800/40 rounded-xl space-y-1.5">
-                <div className="flex items-center gap-1.5 text-xs text-emerald-300 font-semibold">
-                  <Leaf className="w-3.5 h-3.5" />
-                  <span>Surface Product (0–5m Optical Layer)</span>
-                </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Chlorophyll-a is derived from the Oceansat-2 Ocean Colour Radiometer (OCM-2) measuring spectral optical radiance in the first optical penetration depth (0–5m). Subsurface water column controls are disabled for this surface product.
-                </p>
+              <div className="p-2.5 bg-[#161616] border border-[#262626] rounded-md text-[10px] text-[#A3A3A3] leading-relaxed">
+                Chlorophyll-a is an optical surface radiometric product (0–5m). Subsurface vertical layers are constrained to the surface euphotic zone.
               </div>
             ) : (
               <>
-                {/* Quick depth step buttons for 3D temperature/salinity water column */}
                 <div className="grid grid-cols-3 gap-1.5">
                   {DEPTH_LEVELS.map((d) => (
                     <button
                       key={d}
                       id={`btn-depth-${d}`}
                       onClick={() => onChangeState({ depth: d })}
-                      className={`py-1 px-1.5 rounded-lg text-xs font-mono font-medium transition-all text-center border cursor-pointer ${
+                      className={`py-1 px-1.5 rounded-md text-xs font-mono transition-colors text-center border cursor-pointer ${
                         state.depth === d
-                          ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 font-semibold shadow-md'
-                          : 'bg-slate-800/70 border-slate-700/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                          ? 'bg-[#161616] border-[#F5C518] text-[#F5C518] font-medium'
+                          : 'bg-[#161616] border-[#262626] text-[#A3A3A3] hover:border-[#404040] hover:text-[#F5F5F5]'
                       }`}
                     >
-                      {d}m
+                      {d} m
                     </button>
                   ))}
                 </div>
 
                 {/* Continuous Slider */}
-                <div className="pt-1">
+                <div className="pt-1 space-y-1">
+                  <div className="flex justify-between text-[9px] text-[#666666] font-mono">
+                    <span>0 m</span>
+                    <span>2000 m</span>
+                  </div>
                   <input
                     id="slider-depth-control"
                     type="range"
@@ -289,12 +235,12 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
                       const idx = parseInt(e.target.value, 10);
                       onChangeState({ depth: DEPTH_LEVELS[idx] });
                     }}
-                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                    className="w-full h-1 bg-[#262626] rounded appearance-none cursor-pointer accent-[#F5C518]"
                   />
-                  <div className="flex justify-between text-[10px] text-slate-500 font-mono mt-1">
-                    <span>5m (Surface)</span>
-                    <span>Thermocline (100m)</span>
-                    <span>1000m (Intermediate)</span>
+                  <div className="flex justify-between text-[9px] text-[#666666]">
+                    <span>Surface</span>
+                    <span>Thermocline (100 m)</span>
+                    <span>1000 m (Intermediate)</span>
                   </div>
                 </div>
               </>
@@ -302,8 +248,8 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
           </div>
 
           {/* 3. BASEMAP LAYER */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-medium text-[#A3A3A3] uppercase tracking-wider">
               Basemap Layer
             </label>
             <div className="grid grid-cols-2 gap-1.5">
@@ -312,10 +258,10 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
                   key={b}
                   id={`btn-basemap-${b}`}
                   onClick={() => onChangeState({ basemap: b })}
-                  className={`py-1.5 px-2 rounded-lg text-[11px] font-medium capitalize transition-all border cursor-pointer ${
+                  className={`py-1.5 px-2 rounded-md text-xs font-medium capitalize transition-colors border cursor-pointer ${
                     state.basemap === b
-                      ? 'bg-slate-700 border-cyan-400 text-cyan-300'
-                      : 'bg-slate-800/50 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                      ? 'bg-[#161616] border-[#F5C518] text-[#F5F5F5]'
+                      : 'bg-[#161616] border-[#262626] text-[#A3A3A3] hover:border-[#404040] hover:text-[#F5F5F5]'
                   }`}
                 >
                   {b.replace('_', ' ')}
@@ -325,14 +271,14 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
           </div>
 
           {/* 4. COLOR PALETTE & OPACITY */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+              <label className="text-[11px] font-medium text-[#A3A3A3] uppercase tracking-wider">
                 Colormap Palette
               </label>
               <button
                 onClick={() => setAdvancedOpen(!advancedOpen)}
-                className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
+                className="text-[10px] text-[#A3A3A3] hover:text-[#F5C518] flex items-center gap-1 cursor-pointer transition-colors"
               >
                 <Sliders className="w-3 h-3" />
                 <span>{advancedOpen ? 'Simple' : 'Scale Range'}</span>
@@ -345,18 +291,18 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
                   key={cm.type}
                   id={`btn-colormap-${cm.type}`}
                   onClick={() => onChangeState({ colormap: cm.type })}
-                  className={`group relative p-1 rounded-lg border flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                  className={`group relative p-1 rounded-md border flex flex-col items-center gap-1 transition-colors cursor-pointer ${
                     state.colormap === cm.type
-                      ? 'border-cyan-400 bg-slate-800 shadow-md'
-                      : 'border-slate-700/60 bg-slate-900/50 hover:border-slate-600'
+                      ? 'border-[#F5C518] bg-[#161616]'
+                      : 'border-[#262626] bg-[#161616] hover:border-[#404040]'
                   }`}
                   title={cm.label}
                 >
                   <div
-                    className="w-full h-2.5 rounded"
+                    className="w-full h-2 rounded"
                     style={{ background: getColorCssGradient(cm.type) }}
                   />
-                  <span className="text-[9px] text-slate-400 group-hover:text-slate-200 truncate w-full text-center">
+                  <span className="text-[9px] text-[#A3A3A3] group-hover:text-[#F5F5F5] truncate w-full text-center">
                     {cm.label}
                   </span>
                 </button>
@@ -365,9 +311,9 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
 
             {/* Opacity Slider */}
             <div className="space-y-1 pt-1">
-              <div className="flex justify-between text-xs text-slate-400">
+              <div className="flex justify-between text-[10px] text-[#A3A3A3]">
                 <span>Layer Opacity</span>
-                <span className="font-mono text-cyan-300">{Math.round(state.opacity * 100)}%</span>
+                <span className="font-mono text-[#F5C518]">{Math.round(state.opacity * 100)}%</span>
               </div>
               <input
                 id="slider-opacity"
@@ -377,30 +323,28 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
                 step={0.05}
                 value={state.opacity}
                 onChange={(e) => onChangeState({ opacity: parseFloat(e.target.value) })}
-                className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                className="w-full h-1 bg-[#262626] rounded appearance-none cursor-pointer accent-[#F5C518]"
               />
             </div>
 
             {/* Edge Refinement & Ground Blending Controls */}
-            <div className="pt-2 border-t border-slate-800/80 space-y-2">
+            <div className="pt-2 border-t border-[#262626] space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Blend className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="text-[11px] font-medium text-[#A3A3A3] flex items-center gap-1.5">
+                  <Blend className="w-3.5 h-3.5 text-[#A3A3A3]" />
                   <span>Edge & Ground Blending</span>
                 </span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/50">
-                  {state.edgeBlendMode === 'soft_feather'
-                    ? 'Soft Ground (90% Feather)'
-                    : 'Crisp Grid'}
+                <span className="text-[10px] font-mono text-[#F5C518]">
+                  {state.edgeBlendMode === 'soft_feather' ? 'Soft Blend (90% Feather)' : 'Crisp Grid'}
                 </span>
               </div>
 
-              {/* Blending Mode Pills (Soft Blend with fixed 90% shoreline feather vs Crisp) */}
+              {/* Blending Mode Pills */}
               <div className="grid grid-cols-2 gap-1.5">
                 {(
                   [
-                    { id: 'soft_feather', label: 'Soft Blend', title: 'Smooth 90% coastal ground feathering with zero land bleed' },
-                    { id: 'crisp', label: 'Crisp Grid', title: 'Sharp mathematical bounding box & coastline cut' },
+                    { id: 'soft_feather', label: 'Soft Blend', title: 'Smooth coastal ground feathering with zero land bleed' },
+                    { id: 'crisp', label: 'Crisp Grid', title: 'Sharp mathematical bounding box' },
                   ] as { id: EdgeBlendMode; label: string; title: string }[]
                 ).map((mode) => (
                   <button
@@ -408,32 +352,23 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
                     id={`btn-blend-mode-${mode.id}`}
                     onClick={() => onChangeState({ edgeBlendMode: mode.id })}
                     title={mode.title}
-                    className={`py-1.5 px-2 rounded-lg text-[10px] font-medium transition-all border cursor-pointer text-center ${
+                    className={`py-1 px-2 rounded-md text-[10px] font-medium transition-colors border cursor-pointer text-center ${
                       state.edgeBlendMode === mode.id
-                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 font-semibold'
-                        : 'bg-slate-900/60 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                        ? 'bg-[#161616] border-[#F5C518] text-[#F5F5F5]'
+                        : 'bg-[#161616] border-[#262626] text-[#A3A3A3] hover:border-[#404040] hover:text-[#F5F5F5]'
                     }`}
                   >
                     {mode.label}
                   </button>
                 ))}
               </div>
-
-              {/* 4X Super-Sampling & Land Isolation Status */}
-              <div className="flex items-center justify-between text-[9px] text-slate-400 bg-slate-900/50 px-2 py-1.5 rounded-lg border border-slate-800">
-                <span className="flex items-center gap-1 text-slate-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span>4X Spline (90% Feather)</span>
-                </span>
-                <span className="text-emerald-400/90 font-mono">Zero Land Bleed</span>
-              </div>
             </div>
 
             {/* Advanced Scale Controls */}
             {advancedOpen && (
-              <div className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-800 space-y-2 mt-2">
-                <div className="flex items-center justify-between text-xs text-slate-300">
-                  <span>Color Dynamic Range</span>
+              <div className="p-2.5 bg-[#161616] rounded-md border border-[#262626] space-y-2 mt-2">
+                <div className="flex items-center justify-between text-xs text-[#A3A3A3]">
+                  <span>Scale Dynamic Range</span>
                   <button
                     onClick={() =>
                       onChangeState({
@@ -443,14 +378,14 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
                         customMax: defaultRange.max,
                       })
                     }
-                    className="text-[10px] font-mono text-cyan-400 hover:underline cursor-pointer"
+                    className="text-[10px] font-mono text-[#F5C518] hover:underline cursor-pointer"
                   >
                     Reset Auto
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <label className="text-[10px] text-slate-400 block mb-0.5">Min ({defaultRange.unit})</label>
+                    <label className="text-[10px] text-[#666666] block mb-0.5">Min ({defaultRange.unit})</label>
                     <input
                       type="number"
                       step={defaultRange.isLog ? 0.01 : 0.5}
@@ -461,11 +396,11 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
                           customMin: parseFloat(e.target.value),
                         })
                       }
-                      className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 font-mono"
+                      className="w-full bg-[#101010] border border-[#262626] rounded px-2 py-1 text-[#F5F5F5] font-mono text-xs focus:outline-none focus:border-[#F5C518]"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-400 block mb-0.5">Max ({defaultRange.unit})</label>
+                    <label className="text-[10px] text-[#666666] block mb-0.5">Max ({defaultRange.unit})</label>
                     <input
                       type="number"
                       step={defaultRange.isLog ? 1.0 : 0.5}
@@ -476,7 +411,7 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
                           customMax: parseFloat(e.target.value),
                         })
                       }
-                      className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 font-mono"
+                      className="w-full bg-[#101010] border border-[#262626] rounded px-2 py-1 text-[#F5F5F5] font-mono text-xs focus:outline-none focus:border-[#F5C518]"
                     />
                   </div>
                 </div>
@@ -485,19 +420,19 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
           </div>
 
           {/* 5. IN-SITU OBSERVATIONS & DISCREPANCY FILTER */}
-          <div className="space-y-3 pt-2 border-t border-slate-800">
+          <div className="space-y-2 pt-2 border-t border-[#262626]">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                <Radio className="w-3.5 h-3.5 text-emerald-400" />
+              <label className="text-[11px] font-medium text-[#A3A3A3] uppercase tracking-wider flex items-center gap-1.5">
+                <Radio className="w-3.5 h-3.5 text-[#F5C518]" />
                 <span>In-Situ Observations</span>
               </label>
               <button
                 id="toggle-argo-visibility"
                 onClick={() => onChangeState({ showArgo: !state.showArgo })}
-                className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer border ${
                   state.showArgo
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/60'
-                    : 'bg-slate-800 text-slate-500 border border-slate-700'
+                    ? 'bg-[#F5C518] text-[#080808] border-[#F5C518]'
+                    : 'bg-[#161616] text-[#666666] border-[#262626]'
                 }`}
               >
                 {state.showArgo ? 'ON' : 'OFF'}
@@ -505,13 +440,13 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
             </div>
 
             {state.showArgo && (
-              <div className="space-y-2 p-2.5 bg-slate-950/50 rounded-xl border border-slate-800">
-                <div className="flex items-center justify-between text-xs text-slate-300">
+              <div className="space-y-2 p-2.5 bg-[#161616] rounded-md border border-[#262626]">
+                <div className="flex items-center justify-between text-xs text-[#A3A3A3]">
                   <span className="flex items-center gap-1">
-                    <Filter className="w-3 h-3 text-cyan-400" />
+                    <Filter className="w-3 h-3 text-[#A3A3A3]" />
                     <span>Discrepancy Filter</span>
                   </span>
-                  <span className="font-mono text-cyan-400 text-[11px]">
+                  <span className="font-mono text-[#F5C518] text-[10px]">
                     {activeFloatsCount} / {totalFloatsCount} Floats
                   </span>
                 </div>
@@ -522,52 +457,130 @@ export const LeftControlPanel: React.FC<LeftControlPanelProps> = ({
                       key={thresh}
                       id={`btn-discrepancy-${thresh}`}
                       onClick={() => onChangeState({ discrepancyThreshold: thresh })}
-                      className={`py-1 px-1.5 rounded-lg text-xs font-mono transition-all border cursor-pointer ${
+                      className={`py-1 px-1 rounded-md text-xs font-mono transition-colors border cursor-pointer text-center ${
                         state.discrepancyThreshold === thresh
-                          ? thresh >= 2.0
-                            ? 'bg-red-500/25 border-red-500 text-red-200 font-semibold'
-                            : 'bg-cyan-500/25 border-cyan-400 text-cyan-200 font-semibold'
-                          : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                          ? 'bg-[#101010] border-[#F5C518] text-[#F5C518] font-medium'
+                          : 'bg-[#101010] border-[#262626] text-[#A3A3A3] hover:border-[#404040] hover:text-[#F5F5F5]'
                       }`}
                     >
-                      {thresh === 0 ? 'All' : `±${thresh}${state.variable === 'CHLA' ? '' : '°'}`}
+                      {thresh === 0 ? 'All' : `> ${thresh}${state.variable === 'CHLA' ? '' : '°C'}`}
                     </button>
                   ))}
                 </div>
-                <p className="text-[10px] text-slate-400 leading-tight">
-                  Filters floats where |Observation − Model| exceeds the selected threshold at{' '}
-                  <span className="text-amber-300 font-mono">{state.depth}m</span>.
+                <p className="text-[10px] text-[#666666] leading-tight">
+                  Filters floats where |Observation − Model| exceeds the selected threshold.
                 </p>
+
+                {/* Argo Float Platform Directory */}
+                <div className="pt-2 border-t border-[#262626] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-[#A3A3A3] flex items-center gap-1">
+                      <Navigation className="w-3 h-3 text-[#F5C518]" />
+                      <span>Argo Float Directory</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-[#666666]">
+                      {filteredFloatList.length} platforms
+                    </span>
+                  </div>
+
+                  {/* Search Input */}
+                  <div className="relative">
+                    <Search className="w-3 h-3 text-[#666666] absolute left-2 top-2" />
+                    <input
+                      id="input-search-argo-floats"
+                      type="text"
+                      placeholder="Search WMO ID or Basin..."
+                      value={floatSearch}
+                      onChange={(e) => setFloatSearch(e.target.value)}
+                      className="w-full bg-[#101010] border border-[#262626] rounded-md pl-6 pr-2 py-1 text-[11px] text-[#F5F5F5] placeholder-[#666666] focus:outline-none focus:border-[#F5C518]"
+                    />
+                  </div>
+
+                  {/* Scrollable list of all float platforms */}
+                  <div className="max-h-36 overflow-y-auto custom-scrollbar space-y-1 pr-0.5">
+                    {filteredFloatList.map((f) => {
+                      const isSelected =
+                        state.selectedFloatId === f.id ||
+                        state.selectedFloatId === f.platformNumber ||
+                        state.selectedFloatId === `argo-${f.platformNumber}`;
+                      const profile = f.profiles.find((p) => p.depth === state.depth) || f.profiles[0];
+                      const delta =
+                        state.variable === 'TEMP'
+                          ? profile.tempDelta
+                          : state.variable === 'SAL'
+                          ? profile.salDelta
+                          : profile.chlaDelta || 0;
+
+                      return (
+                        <button
+                          key={f.id}
+                          id={`btn-select-float-${f.platformNumber}`}
+                          onClick={() => {
+                            onChangeState({
+                              selectedFloatId: isSelected ? null : f.id,
+                              selectedProbePoint: null,
+                            });
+                          }}
+                          className={`w-full text-left px-2 py-1.5 rounded-md text-xs transition-colors flex items-center justify-between border cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#101010] border-[#F5C518] text-[#F5F5F5]'
+                              : 'bg-[#101010] border-[#262626] text-[#A3A3A3] hover:border-[#404040] hover:text-[#F5F5F5]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 truncate">
+                            <div
+                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                isSelected
+                                  ? 'bg-[#F5C518]'
+                                  : 'bg-[#666666]'
+                              }`}
+                            />
+                            <span className="font-mono font-medium truncate text-[#F5F5F5]">
+                              Argo {f.platformNumber}
+                            </span>
+                            <span className="text-[10px] text-[#666666] truncate">({f.basin})</span>
+                          </div>
+                          <span
+                            className={`text-[10px] font-mono shrink-0 ml-1 ${
+                              isSelected ? 'text-[#F5C518]' : 'text-[#666666]'
+                            }`}
+                          >
+                            {delta > 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
           {/* 6. PROVENANCE & DATASET INFO */}
-          <div className="mt-auto pt-3 border-t border-slate-800 text-xs text-slate-400 space-y-1.5">
-            <div className="flex items-center gap-1.5 text-slate-300 font-semibold text-[11px] uppercase tracking-wider">
-              <Database className="w-3.5 h-3.5 text-cyan-400" />
+          <div className="mt-auto pt-2 border-t border-[#262626] text-xs text-[#A3A3A3] space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-[#A3A3A3]">
               <span>Dataset Provenance</span>
+              <a
+                href={state.variable === 'CHLA'
+                  ? "https://erddap.incois.gov.in/erddap/griddap/incois_oceansat2_datasets.html"
+                  : "https://erddap.incois.gov.in/erddap/griddap/incois_argo_mnt_VAM.html"
+                }
+                target="_blank"
+                rel="noreferrer"
+                className="text-[#F5C518] hover:underline inline-flex items-center gap-0.5 text-[9px] lowercase font-mono"
+              >
+                <span>erddap</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
             </div>
-            <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800 text-[11px] font-mono space-y-1">
-              <div className="flex items-center justify-between text-cyan-300">
-                <span className="truncate">{state.variable === 'CHLA' ? 'incois_oceansat2_datasets' : 'incois_argo_10d_VAM'}</span>
-                <a
-                  href={state.variable === 'CHLA'
-                    ? "https://erddap.incois.gov.in/erddap/griddap/incois_oceansat2_datasets.html"
-                    : "https://erddap.incois.gov.in/erddap/griddap/incois_argo_10d_VAM.html"
-                  }
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-0.5 text-[9px]"
-                >
-                  <span>ERDDAP</span>
-                  <ExternalLink className="w-2.5 h-2.5" />
-                </a>
+            <div className="bg-[#161616] p-2 rounded-md border border-[#262626] text-[10px] font-mono space-y-0.5">
+              <div className="text-[#F5C518] truncate">
+                {state.variable === 'CHLA' ? 'incois_oceansat2_datasets' : 'incois_argo_mnt_VAM'}
               </div>
-              <div className="text-slate-400">
-                {state.variable === 'CHLA' ? 'Variable: CHL (mg/m³) • Oceansat-2 (OCM-2)' : `Variable: ${state.variable} • Res: 0.25° × 0.25°`}
+              <div className="text-[#666666] text-[9.5px]">
+                {state.variable === 'CHLA' ? 'Variable: CHL (mg/m³) • Res: 0.25°' : `Variable: ${state.variable} • Res: 0.25° × 0.25°`}
               </div>
-              <div className="text-slate-500 text-[10px]">INCOIS MoES Hyderabad • Indian Ocean</div>
+              <div className="text-[#666666] text-[9px]">INCOIS MoES Hyderabad • Indian Ocean</div>
             </div>
           </div>
         </div>
