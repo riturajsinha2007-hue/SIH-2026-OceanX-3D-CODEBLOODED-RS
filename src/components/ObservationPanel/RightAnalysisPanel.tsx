@@ -31,6 +31,7 @@ interface RightAnalysisPanelProps {
   state: VisualizationState;
   onChangeDepth: (depth: DepthLevel) => void;
   onChangeVariable: (variable: OceanVariable) => void;
+  onOpenComparisonModal?: () => void;
 }
 
 type ModelCompareMode = 'both' | 'observed' | 'model';
@@ -47,6 +48,7 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
   state,
   onChangeDepth,
   onChangeVariable,
+  onOpenComparisonModal,
 }) => {
   const [profileVar, setProfileVar] = useState<OceanVariable>(state.variable);
   const [compareMode, setCompareMode] = useState<ModelCompareMode>('both');
@@ -294,11 +296,24 @@ export const RightAnalysisPanel: React.FC<RightAnalysisPanelProps> = ({
             </div>
 
             {/* Float Title */}
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-[#F5C518] shrink-0" />
-              <h2 className="text-sm font-semibold text-[#F5F5F5]">
-                Argo Float {platformMeta.wmoId}
-              </h2>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-[#F5C518] shrink-0" />
+                <h2 className="text-sm font-semibold text-[#F5F5F5]">
+                  Argo Float {platformMeta.wmoId}
+                </h2>
+              </div>
+              {onOpenComparisonModal && (
+                <button
+                  id="btn-open-comparison-modal-from-float"
+                  onClick={onOpenComparisonModal}
+                  className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#101010] text-[#F5C518] border border-[#F5C518] hover:bg-[#202020] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                  title="Open in-depth Model vs Observation comparison window"
+                >
+                  <Activity className="w-3 h-3" />
+                  <span>Model vs Obs</span>
+                </button>
+              )}
             </div>
 
             {/* Metadata Rows (Clean key-value pairs matching reference) */}

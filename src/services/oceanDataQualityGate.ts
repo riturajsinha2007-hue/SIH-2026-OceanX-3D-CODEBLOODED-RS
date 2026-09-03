@@ -80,7 +80,7 @@ export function validateScientificData(input: ScientificValidationInput): PreRen
   const warnings: string[] = [];
   let reason: string | undefined;
 
-  const expectedUnit = variable === 'TEMP' ? '°C' : variable === 'SAL' ? 'PSU' : 'mg/m³';
+  const expectedUnit = variable === 'TEMP' ? '°C' : variable === 'SAL' ? 'PSU' : variable === 'SSH' ? 'm' : 'mg/m³';
   const cleanReqDate = reqDate.split('T')[0];
 
   const fallbackProvenance: DataProvenanceInfo = {
@@ -137,12 +137,12 @@ export function validateScientificData(input: ScientificValidationInput): PreRen
   // 4. Date Match & Temporal Coverage Verification
   const actualDate = returnedData.timeStr ? returnedData.timeStr.split('T')[0] : '';
   if (!actualDate || !actualDate.startsWith(cleanReqDate.substring(0, 7))) {
-    // For daily datasets (CHLA), require exact date; for monthly (ARGO VAM), require exact year-month
+    // For daily datasets (CHLA), require exact date; for monthly (ARGO VAM, SSH), require exact year-month
     if (variable === 'CHLA' && actualDate !== cleanReqDate) {
       errors.push(`Date mismatch for Chlorophyll-a: Requested ${cleanReqDate}, returned ${actualDate}.`);
       reason = reason || 'DATE_MISMATCH';
     } else if (variable !== 'CHLA' && !actualDate.startsWith(cleanReqDate.substring(0, 7))) {
-      errors.push(`Date mismatch for ARGO VAM: Requested ${cleanReqDate}, returned ${actualDate}.`);
+      errors.push(`Date mismatch for ${variable}: Requested ${cleanReqDate}, returned ${actualDate}.`);
       reason = reason || 'DATE_MISMATCH';
     }
   }
@@ -153,6 +153,11 @@ export function validateScientificData(input: ScientificValidationInput): PreRen
       errors.push(`Date ${cleanReqDate} is outside Oceansat-2 mission coverage [2011-02-02, 2020-05-01].`);
       reason = reason || 'DATE_MISMATCH';
     }
+  } else if (variable === 'SSH') {
+    if (cleanReqDate < '2004-01-15' || cleanReqDate > '2026-07-15') {
+      errors.push(`Date ${cleanReqDate} is outside Altimetry temporal coverage [2004-01-15, 2026-07-15].`);
+      reason = reason || 'DATE_MISMATCH';
+    }
   } else {
     if (cleanReqDate < '2004-01-15' || cleanReqDate > '2026-07-15') {
       errors.push(`Date ${cleanReqDate} is outside ARGO VAM temporal coverage [2004-01-15, 2026-07-15].`);
@@ -161,18 +166,19 @@ export function validateScientificData(input: ScientificValidationInput): PreRen
   }
 
   // 5. Depth Verification
-  if (variable === 'CHLA') {
+  if (variable === 'CHLA' || variable === 'SSH') {
     if (reqDepth !== 0 && reqDepth !== 5) {
-      errors.push(`Chlorophyll-a is surface-only optical ocean color. Depth ${reqDepth}m is invalid.`);
+      errors.push(`${variable === 'SSH' ? 'Sea Surface Height' : 'Chlorophyll-a'} is surface-only. Depth ${reqDepth}m is invalid.`);
       reason = reason || 'DEPTH_UNAVAILABLE';
     }
   } else {
-    const supportedDepths = [5, 10, 20, 30, 50, 75, 100, 125, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1750, 2000];
+    // ARGO VAM levels are 5m to 2000m. 0m is accepted as surface layer (mapped to 5m uppermost CTD layer).
+    const supportedDepths = [0, 5, 10, 20, 30, 50, 75, 100, 125, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1750, 2000];
     if (!supportedDepths.includes(reqDepth)) {
       errors.push(`Depth ${reqDepth}m is not supported by ARGO VAM dataset.`);
       reason = reason || 'DEPTH_UNAVAILABLE';
     }
-    if (returnedData.depth !== undefined && returnedData.depth !== reqDepth) {
+    if (returnedData.depth !== undefined && returnedData.depth !== reqDepth && !(reqDepth === 0 && returnedData.depth === 5)) {
       errors.push(`Returned depth ${returnedData.depth}m does not match requested depth ${reqDepth}m.`);
       reason = reason || 'DEPTH_UNAVAILABLE';
     }
@@ -219,6 +225,12 @@ export function validateScientificData(input: ScientificValidationInput): PreRen
       } else if (variable === 'CHLA') {
         if (val < 0.0 || val > 50.0) {
           errors.push(`Physical limit violation: Chlorophyll-a ${val.toFixed(2)} mg/m³ at index ${i} outside [0, 50] mg/m³.`);
+          reason = reason || 'PHYSICAL_LIMIT_EXCEEDED';
+          break;
+        }
+      } else if (variable === 'SSH') {
+        if (val < -2.0 || val > 2.0) {
+          errors.push(`Physical limit violation: Sea Surface Height ${val.toFixed(2)} m at index ${i} outside [-2, 2] m.`);
           reason = reason || 'PHYSICAL_LIMIT_EXCEEDED';
           break;
         }
@@ -297,21 +309,22 @@ export function validateOceanDataRequest(params: {
   const errors: string[] = [];
 
   // 1. Variable check
-  if (params.variable !== 'TEMP' && params.variable !== 'SAL' && params.variable !== 'CHLA') {
-    errors.push(`Invalid variable: "${params.variable}". Allowed: TEMP, SAL, CHLA.`);
+  if (params.variable !== 'TEMP' && params.variable !== 'SAL' && params.variable !== 'CHLA' && params.variable !== 'SSH') {
+    errors.push(`Invalid variable: "${params.variable}". Allowed: TEMP, SAL, CHLA, SSH.`);
   }
 
   // 2. Depth check
-  if (params.variable === 'CHLA') {
+  if (params.variable === 'CHLA' || params.variable === 'SSH') {
     if (params.depth !== 0 && params.depth !== 5) {
-      errors.push(`CHLA (Oceansat-2) is strictly surface-level optical ocean color. Depth must be 0m.`);
+      errors.push(`${params.variable === 'SSH' ? 'SSH' : 'CHLA'} is strictly surface-level. Depth must be 0m.`);
     }
   } else {
     if (params.depth < 0 || params.depth > 2000) {
       errors.push(`Depth ${params.depth}m is outside ARGO VAM vertical extent [0m, 2000m].`);
     }
     if (params.allowedDepths && params.allowedDepths.length > 0) {
-      if (!params.allowedDepths.includes(params.depth)) {
+      const allowed = [...params.allowedDepths, 0];
+      if (!allowed.includes(params.depth)) {
         errors.push(`Depth ${params.depth}m is not in the official ZAX metadata depth list.`);
       }
     }
@@ -354,6 +367,10 @@ export function validateOceanDataResponse(
     if (slice.datasetId !== OCEANSAT2_CHLOROPHYLL_DATASET.datasetId) {
       errors.push(`Dataset ID mismatch for CHLA. Expected "${OCEANSAT2_CHLOROPHYLL_DATASET.datasetId}", got "${slice.datasetId}".`);
     }
+  } else if (expected.variable === 'SSH') {
+    if (slice.datasetId !== 'incois_altimetry_ssh') {
+      errors.push(`Dataset ID mismatch for SSH. Expected "incois_altimetry_ssh", got "${slice.datasetId}".`);
+    }
   } else {
     if (slice.datasetId !== ARGO_VAM_DATASET.datasetId) {
       errors.push(`Dataset ID mismatch. Expected "${ARGO_VAM_DATASET.datasetId}", got "${slice.datasetId}".`);
@@ -366,8 +383,10 @@ export function validateOceanDataResponse(
   }
 
   // 3. Depth verification
-  if (expected.variable !== 'CHLA' && slice.depth !== expected.depth) {
-    errors.push(`Depth level mismatch. Expected ${expected.depth}m, got ${slice.depth}m.`);
+  if (expected.variable !== 'CHLA' && expected.variable !== 'SSH') {
+    if (slice.depth !== expected.depth && !(expected.depth === 0 && slice.depth === 5)) {
+      errors.push(`Depth level mismatch. Expected ${expected.depth}m, got ${slice.depth}m.`);
+    }
   }
 
   // 4. Coordinates & Grid Dimensions
@@ -416,6 +435,11 @@ export function validateOceanDataResponse(
         errors.push(`Unrealistic chlorophyll concentration: ${val.toFixed(2)} mg/m³ at index ${i}.`);
         break;
       }
+    } else if (expected.variable === 'SSH') {
+      if (val < -2.0 || val > 2.0) {
+        errors.push(`Unrealistic sea surface height anomaly: ${val.toFixed(2)} m at index ${i}.`);
+        break;
+      }
     }
   }
 
@@ -428,7 +452,14 @@ export function validateOceanDataResponse(
   }
 
   // 6. Unit Verification
-  const expectedUnit = expected.variable === 'TEMP' ? '°C' : expected.variable === 'SAL' ? 'PSU' : 'mg/m³';
+  const expectedUnit =
+    expected.variable === 'TEMP'
+      ? '°C'
+      : expected.variable === 'SAL'
+      ? 'PSU'
+      : expected.variable === 'SSH'
+      ? 'm'
+      : 'mg/m³';
   if (slice.unit && slice.unit !== expectedUnit && !slice.unit.includes(expectedUnit.replace('°', ''))) {
     warnings.push(`Unit string "${slice.unit}" differs from standard "${expectedUnit}".`);
   }
@@ -492,6 +523,8 @@ export function performCrossCheckSampling(
       let isValid = true;
       if (variable === 'TEMP' && (val < 1.0 || val > 35.0)) isValid = false;
       if (variable === 'SAL' && (val < 25.0 || val > 42.0)) isValid = false;
+      if (variable === 'SSH' && (val < -1.0 || val > 1.0)) isValid = false;
+      if (variable === 'CHLA' && (val < 0.0 || val > 40.0)) isValid = false;
 
       return {
         locationName: loc.name,
@@ -532,6 +565,13 @@ export function validateOceanDataBeforeRender(params: {
   const { variable, timeStr, depth, slice, isCached = false } = params;
   const cleanReqDate = timeStr.includes('T') ? timeStr.split('T')[0] : timeStr;
 
+  const datasetId =
+    variable === 'CHLA'
+      ? OCEANSAT2_CHLOROPHYLL_DATASET.datasetId
+      : variable === 'SSH'
+      ? 'incois_altimetry_ssh'
+      : ARGO_VAM_DATASET.datasetId;
+
   // 1. Stage 1: Request Validation
   const reqCheck = validateOceanDataRequest({ variable, timeStr, depth });
   if (!reqCheck.valid) {
@@ -543,17 +583,17 @@ export function validateOceanDataBeforeRender(params: {
       errors: reqCheck.errors,
       warnings: [],
       provenance: {
-        datasetId: variable === 'CHLA' ? OCEANSAT2_CHLOROPHYLL_DATASET.datasetId : ARGO_VAM_DATASET.datasetId,
+        datasetId,
         sourceOrg: 'INCOIS (Indian National Centre for Ocean Information Services)',
         variable,
-        units: variable === 'TEMP' ? '°C' : variable === 'SAL' ? 'PSU' : 'mg/m³',
+        units: variable === 'TEMP' ? '°C' : variable === 'SAL' ? 'PSU' : variable === 'SSH' ? 'm' : 'mg/m³',
         timeStr,
         requestedDate: cleanReqDate,
         actualDate: 'N/A',
         depth,
         requestedDepth: depth,
         actualDepth: depth,
-        spatialResolution: variable === 'CHLA' ? '0.25°' : '1.0°',
+        spatialResolution: variable === 'CHLA' ? '0.25°' : variable === 'SSH' ? '0.5°' : '1.0°',
         spatialBounds: {
           latMin: GRID_METADATA.latMin,
           latMax: GRID_METADATA.latMax,
@@ -579,17 +619,17 @@ export function validateOceanDataBeforeRender(params: {
       errors: ['Data slice not currently available from INCOIS ERDDAP.'],
       warnings: [],
       provenance: {
-        datasetId: variable === 'CHLA' ? OCEANSAT2_CHLOROPHYLL_DATASET.datasetId : ARGO_VAM_DATASET.datasetId,
+        datasetId,
         sourceOrg: 'INCOIS (Indian National Centre for Ocean Information Services)',
         variable,
-        units: variable === 'TEMP' ? '°C' : variable === 'SAL' ? 'PSU' : 'mg/m³',
+        units: variable === 'TEMP' ? '°C' : variable === 'SAL' ? 'PSU' : variable === 'SSH' ? 'm' : 'mg/m³',
         timeStr,
         requestedDate: cleanReqDate,
         actualDate: 'N/A',
         depth,
         requestedDepth: depth,
         actualDepth: depth,
-        spatialResolution: variable === 'CHLA' ? '0.25°' : '1.0°',
+        spatialResolution: variable === 'CHLA' ? '0.25°' : variable === 'SSH' ? '0.5°' : '1.0°',
         spatialBounds: {
           latMin: GRID_METADATA.latMin,
           latMax: GRID_METADATA.latMax,
@@ -622,14 +662,14 @@ export function validateOceanDataBeforeRender(params: {
         datasetId: slice.datasetId,
         sourceOrg: 'INCOIS (Indian National Centre for Ocean Information Services)',
         variable,
-        units: slice.unit || (variable === 'TEMP' ? '°C' : variable === 'SAL' ? 'PSU' : 'mg/m³'),
+        units: slice.unit || (variable === 'TEMP' ? '°C' : variable === 'SAL' ? 'PSU' : variable === 'SSH' ? 'm' : 'mg/m³'),
         timeStr,
         requestedDate: cleanReqDate,
         actualDate,
         depth,
         requestedDepth: depth,
         actualDepth,
-        spatialResolution: '1.0°',
+        spatialResolution: variable === 'CHLA' ? '0.25°' : variable === 'SSH' ? '0.5°' : '1.0°',
         spatialBounds: {
           latMin: slice.latMin,
           latMax: slice.latMax,

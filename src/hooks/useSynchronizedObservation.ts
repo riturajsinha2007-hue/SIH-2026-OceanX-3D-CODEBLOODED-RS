@@ -12,6 +12,7 @@ import {
   computeDynamicArgoProfile,
   computeOceanValue,
 } from '../data/incoisDataset';
+import { isSurfaceOnlyVariable } from '../utils/scientificColormaps';
 import {
   fetchArgoFloatLiveProfile,
   SynchronizedFloatProfileResponse,
@@ -38,8 +39,9 @@ export function useSynchronizedObservation(params: UseSynchronizedObservationPar
     selectedProbePoint,
   } = params;
 
-  const unit = variable === 'TEMP' ? '°C' : variable === 'SAL' ? 'PSU' : 'mg/m³';
-  const targetDepth = typeof depth === 'number' && isFinite(depth) ? depth : 5;
+  const isSurface = isSurfaceOnlyVariable(variable);
+  const unit = variable === 'TEMP' ? '°C' : variable === 'SAL' ? 'PSU' : variable === 'SSH' ? 'm' : 'mg/m³';
+  const targetDepth = isSurface ? 0 : (typeof depth === 'number' && depth > 0 ? depth : 5);
 
   const [state, setState] = useState<SynchronizedObservationState>(() => {
     return createInitialState(params, unit, targetDepth);

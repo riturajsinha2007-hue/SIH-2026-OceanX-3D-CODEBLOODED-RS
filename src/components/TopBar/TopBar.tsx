@@ -7,13 +7,16 @@ import {
   ShieldCheck,
   Search,
   HelpCircle,
-  Bell,
+  Activity,
+  Database,
 } from 'lucide-react';
 
 interface TopBarProps {
   state: VisualizationState;
   onOpenExport: () => void;
   onOpenInfo: () => void;
+  onOpenComparison?: () => void;
+  onOpenPipeline?: () => void;
   onToggleDebug?: () => void;
 }
 
@@ -21,6 +24,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   state,
   onOpenExport,
   onOpenInfo,
+  onOpenComparison,
+  onOpenPipeline,
   onToggleDebug,
 }) => {
   return (
@@ -42,12 +47,12 @@ export const TopBar: React.FC<TopBarProps> = ({
               </h1>
             </div>
             <p className="text-[10px] text-[#A3A3A3] leading-none">
-              Scientific Ocean Workspace
+              Scientific Ocean Workspace • Indian Ocean
             </p>
           </div>
         </div>
 
-        {/* Navigation Tabs (Explore, Compare, Datasets, About) */}
+        {/* Navigation Tabs (Explore, Compare, Pipeline, About) */}
         <nav className="hidden lg:flex items-center gap-1 text-xs">
           <button
             className="px-3 py-1.5 font-medium text-[#F5F5F5] border-b-2 border-[#F5C518] transition-colors cursor-pointer"
@@ -55,16 +60,20 @@ export const TopBar: React.FC<TopBarProps> = ({
             Explore
           </button>
           <button
-            onClick={onOpenInfo}
-            className="px-3 py-1.5 text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            id="nav-btn-compare"
+            onClick={onOpenComparison}
+            className="px-3 py-1.5 text-[#A3A3A3] hover:text-[#F5C518] transition-colors cursor-pointer flex items-center gap-1"
           >
-            Compare
+            <Activity className="w-3.5 h-3.5 text-[#F5C518]" />
+            <span>Model vs ARGO</span>
           </button>
           <button
-            onClick={onOpenInfo}
-            className="px-3 py-1.5 text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors cursor-pointer"
+            id="nav-btn-datasets"
+            onClick={onOpenPipeline}
+            className="px-3 py-1.5 text-[#A3A3A3] hover:text-[#F5C518] transition-colors cursor-pointer flex items-center gap-1"
           >
-            Datasets
+            <Database className="w-3.5 h-3.5" />
+            <span>Data Pipeline & Subsetting</span>
           </button>
           <button
             onClick={onOpenInfo}
@@ -82,8 +91,8 @@ export const TopBar: React.FC<TopBarProps> = ({
           <input
             type="text"
             readOnly
-            onClick={onOpenInfo}
-            placeholder="Search location, float, dataset..."
+            onClick={onOpenComparison || onOpenInfo}
+            placeholder="Search float or compare model..."
             className="w-full h-7.5 pl-8 pr-7 bg-[#161616] border border-[#262626] rounded-md text-xs text-[#F5F5F5] placeholder-[#666666] focus:outline-none focus:border-[#F5C518] cursor-pointer"
           />
           <kbd className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[#666666] bg-[#101010] px-1 rounded border border-[#262626]">
@@ -94,6 +103,30 @@ export const TopBar: React.FC<TopBarProps> = ({
 
       {/* Right: Actions & Modals */}
       <div className="flex items-center gap-2">
+        {onOpenComparison && (
+          <button
+            id="btn-topbar-compare"
+            onClick={onOpenComparison}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-[#161616] hover:bg-[#1e1e1e] text-[#F5C518] border border-[#F5C518] transition-colors cursor-pointer font-medium"
+            title="Model vs Observation Comparison"
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Compare</span>
+          </button>
+        )}
+
+        {onOpenPipeline && (
+          <button
+            id="btn-topbar-pipeline"
+            onClick={onOpenPipeline}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-[#161616] hover:bg-[#1e1e1e] text-[#A3A3A3] hover:text-[#F5F5F5] border border-[#262626] transition-colors cursor-pointer"
+            title="Data Subsetting & Pipeline"
+          >
+            <Database className="w-3.5 h-3.5 text-[#38bdf8]" />
+            <span>Subsetting</span>
+          </button>
+        )}
+
         {onToggleDebug && (
           <button
             id="btn-toggle-debug-mode"
@@ -106,7 +139,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             title="Toggle Single Source of Truth Synchronization Audit Inspector"
           >
             <ShieldCheck className={`w-3.5 h-3.5 ${state.debugMode ? 'text-[#F5C518]' : 'text-[#A3A3A3]'}`} />
-            <span className="hidden sm:inline">Audit</span>
+            <span className="hidden md:inline">Audit</span>
           </button>
         )}
 

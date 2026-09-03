@@ -1,5 +1,5 @@
-import { OceanVariable, DepthLevel, ColormapType, EdgeBlendMode } from '../types/ocean';
-import { GRID_METADATA, generateOceanGridSlice } from '../data/incoisDataset';
+import { OceanVariable, DepthLevel, ColormapType, EdgeBlendMode, ErddapGridSliceData, RenderedRasterResult } from '../types/ocean';
+import { generateOceanGridSlice, getDatasetSpatialBounds } from '../data/incoisDataset';
 import { isLandCoordinate, getOceanAntiAliasedCoverage } from '../data/oceanLandMask';
 import { getColorForValue } from './scientificColormaps';
 
@@ -12,9 +12,12 @@ interface RasterRenderOptions {
   minVal: number;
   maxVal: number;
   isLogScale: boolean;
+  isDiverging?: boolean;
+  referenceCenter?: number;
   edgeBlendMode: EdgeBlendMode;
   coastalFeathering: number; // 0.0 to 1.0
   boundaryFade: boolean;
+  activeSlice?: ErddapGridSliceData | null;
 }
 
 /**
@@ -40,33 +43,32 @@ function getCubicWeights(t: number): [number, number, number, number] {
 
 /**
  * Computes domain boundary fading vignette factor (0.0 at outer bbox edge, 1.0 in domain core).
- * Fades the southern open ocean (-35°S), western (30°E), eastern (120°E), and northern (30°N) margins
- * seamlessly into the global ocean basemap.
+ * Dynamically fades against the dataset's actual geographic bounds.
  */
-function computeBoundaryVignette(lat: number, lon: number): number {
-  const { latMin, latMax, lonMin, lonMax } = GRID_METADATA;
+function computeBoundaryVignette(
+  lat: number,
+  lon: number,
+  bounds: { latMin: number; latMax: number; lonMin: number; lonMax: number }
+): number {
+  const { latMin, latMax, lonMin, lonMax } = bounds;
+  const latSpan = latMax - latMin;
+  const lonSpan = lonMax - lonMin;
+  const latBand = Math.min(3.0, latSpan * 0.08);
+  const lonBand = Math.min(3.5, lonSpan * 0.08);
 
-  // Southern Ocean margin (-35°S): 4.0° smooth transition band into Southern Antarctic waters
-  const fadeSouth = smoothstep(latMin, latMin + 4.0, lat);
-
-  // Northern margin (30°N): 2.5° transition band
-  const fadeNorth = smoothstep(latMax, latMax - 2.5, lat);
-
-  // Western margin (30°E): 3.0° transition band
-  const fadeWest = smoothstep(lonMin, lonMin + 3.0, lon);
-
-  // Eastern margin (120°E): 3.0° transition band
-  const fadeEast = smoothstep(lonMax, lonMax - 3.0, lon);
+  const fadeSouth = smoothstep(latMin, latMin + latBand, lat);
+  const fadeNorth = smoothstep(latMax, latMax - latBand, lat);
+  const fadeWest = smoothstep(lonMin, lonMin + lonBand, lon);
+  const fadeEast = smoothstep(lonMax, lonMax - lonBand, lon);
 
   return fadeSouth * fadeNorth * fadeWest * fadeEast;
 }
 
 /**
- * Generates an ultra-smooth, high-resolution ocean raster canvas (2161 x 1561 px)
- * using C1-continuous bicubic Catmull-Rom interpolation and sub-pixel anti-aliased coastal clipping.
- * Preserves exact scientific data values while removing blocky pixels and jagged coastlines.
+ * Generates an ultra-smooth, high-resolution ocean raster canvas mapped strictly to
+ * the dataset's actual geographic coverage using C1-continuous bicubic Catmull-Rom interpolation.
  */
-export function renderOceanRasterCanvas(options: RasterRenderOptions): HTMLCanvasElement {
+export function renderOceanRasterCanvas(options: RasterRenderOptions): RenderedRasterResult {
   const {
     variable,
     depth,
@@ -76,28 +78,33 @@ export function renderOceanRasterCanvas(options: RasterRenderOptions): HTMLCanva
     minVal,
     maxVal,
     isLogScale,
+    isDiverging = false,
+    referenceCenter = 0,
     edgeBlendMode,
     coastalFeathering,
     boundaryFade,
+    activeSlice,
   } = options;
 
-  // 1. Base numerical model slice (361 x 261 grid points at 0.25° resolution)
-  const slice = generateOceanGridSlice(variable, depth, timeStepIndex);
-  const srcW = slice.width;   // 361
-  const srcH = slice.height;  // 261
+  // 1. Base numerical model slice using actual dataset coordinates
+  const slice = generateOceanGridSlice(variable, depth, timeStepIndex, activeSlice);
+  const { bounds } = slice;
+  const srcW = slice.width;
+  const srcH = slice.height;
 
-  // 2. High-Fidelity Super-Sampling: Creates a high-resolution 2161 x 1561 texture for smooth gradients
-  const scale = 6;
-  const dstW = (srcW - 1) * scale + 1; // 2161
-  const dstH = (srcH - 1) * scale + 1; // 1561
+  // 2. High-Fidelity Super-Sampling: Creates a high-resolution texture for smooth gradients
+  const scale = 5;
+  const dstW = (srcW - 1) * scale + 1;
+  const dstH = (srcH - 1) * scale + 1;
 
   const canvas = document.createElement('canvas');
   canvas.width = dstW;
   canvas.height = dstH;
+  (canvas as any).datasetBounds = bounds;
 
-  // Strict Data Integrity: If zero valid ocean nodes exist in slice, return clean transparent canvas immediately
+  // Strict Data Integrity: If zero valid ocean nodes exist in slice, return clean transparent canvas
   if (slice.minVal === Infinity || slice.maxVal === -Infinity) {
-    return canvas;
+    return { canvas, bounds };
   }
 
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
@@ -115,7 +122,7 @@ export function renderOceanRasterCanvas(options: RasterRenderOptions): HTMLCanva
 
   // 4. Compute Distance-to-Coast / Ocean Proximity Field on source grid
   const coastalWeight = new Float32Array(srcW * srcH);
-  const kernelRadius = 3; // ~0.75° neighborhood
+  const kernelRadius = 3;
 
   for (let j = 0; j < srcH; j++) {
     for (let i = 0; i < srcW; i++) {
@@ -153,7 +160,6 @@ export function renderOceanRasterCanvas(options: RasterRenderOptions): HTMLCanva
       }
 
       const fraction = totalCount > 0 ? waterCount / totalCount : 1.0;
-      // Map water fraction to smooth S-curve feathering
       const featherExponent = 0.6 + (1.0 - coastalFeathering) * 2.2;
       const smoothFraction = smoothstep(0.04, 0.92, fraction);
       coastalWeight[idx] = Math.pow(smoothFraction, featherExponent);
@@ -161,12 +167,13 @@ export function renderOceanRasterCanvas(options: RasterRenderOptions): HTMLCanva
   }
 
   // 5. High-Precision Bicubic Spline Rasterization with Sub-Pixel Anti-Aliased Coastal Masking
-  const latStep = (GRID_METADATA.latMax - GRID_METADATA.latMin) / (dstH - 1);
-  const lonStep = (GRID_METADATA.lonMax - GRID_METADATA.lonMin) / (dstW - 1);
+  // Uses dataset's actual geographic extent dynamically
+  const latStep = (bounds.latMax - bounds.latMin) / (dstH - 1);
+  const lonStep = (bounds.lonMax - bounds.lonMin) / (dstW - 1);
   const isBoundaryFading = boundaryFade && edgeBlendMode !== 'crisp';
 
   for (let dy = 0; dy < dstH; dy++) {
-    const lat = GRID_METADATA.latMax - dy * latStep;
+    const lat = bounds.latMax - dy * latStep;
     const srcYFloat = dy / scale;
     const y1 = Math.floor(srcYFloat);
     const y0 = Math.max(0, y1 - 1);
@@ -182,10 +189,10 @@ export function renderOceanRasterCanvas(options: RasterRenderOptions): HTMLCanva
     const r3 = y3 * srcW;
 
     for (let dx = 0; dx < dstW; dx++) {
-      const lon = GRID_METADATA.lonMin + dx * lonStep;
+      const lon = bounds.lonMin + dx * lonStep;
       const dstPixelIdx = (dy * dstW + dx) * 4;
 
-      // Sub-pixel anti-aliased ocean fraction (0.0 = full land, 1.0 = full ocean, 0.25-0.75 = smooth anti-aliased coast)
+      // Sub-pixel anti-aliased ocean fraction
       const oceanCoverage = getOceanAntiAliasedCoverage(lat, lon, latStep, lonStep);
       if (oceanCoverage <= 0.001) {
         // Pure land terrain: keep 100% transparent
@@ -270,10 +277,12 @@ export function renderOceanRasterCanvas(options: RasterRenderOptions): HTMLCanva
         maxVal,
         colormap,
         opacity,
-        isLogScale
+        isLogScale,
+        isDiverging,
+        referenceCenter
       );
 
-      // Coastal feather weight interpolation (Hermite smoothstep on central 2x2 grid)
+      // Coastal feather weight interpolation
       const cw11 = coastalWeight[r1 + x1];
       const cw12 = coastalWeight[r1 + x2];
       const cw21 = coastalWeight[r2 + x1];
@@ -285,10 +294,10 @@ export function renderOceanRasterCanvas(options: RasterRenderOptions): HTMLCanva
       const botCw = cw21 * (1 - sx) + cw22 * sx;
       const finalCoastWeight = topCw * (1 - sy) + botCw * sy;
 
-      // Boundary vignette
+      // Boundary vignette based on actual dataset extent
       let vignette = 1.0;
       if (isBoundaryFading) {
-        vignette = computeBoundaryVignette(lat, lon);
+        vignette = computeBoundaryVignette(lat, lon, bounds);
       }
 
       let alphaMultiplier = oceanCoverage;
@@ -315,6 +324,7 @@ export function renderOceanRasterCanvas(options: RasterRenderOptions): HTMLCanva
   }
 
   ctx.putImageData(imgData, 0, 0);
-  return canvas;
+  return { canvas, bounds };
 }
+
 

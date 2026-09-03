@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { ARGO_FLOATS, getFloatsFilteredByDiscrepancy, sampleOceanPoint, syncTimeStepForVariable, setDynamicOceansat2TimeSteps, setDynamicArgoVamTimeSteps } from './data/incoisDataset';
 import { DepthLevel, OceanVariable, PointProbeData, VisualizationState } from './types/ocean';
+import { isSurfaceOnlyVariable } from './utils/scientificColormaps';
 import { fetchDynamicOceansat2TimeDimension, fetchDynamicArgoVamTimeDimension } from './services/erddapService';
 import { TopBar } from './components/TopBar/TopBar';
 import { LeftControlPanel } from './components/Controls/LeftControlPanel';
@@ -9,6 +10,9 @@ import { RightAnalysisPanel } from './components/ObservationPanel/RightAnalysisP
 import { BottomTimeline } from './components/Timeline/BottomTimeline';
 import { ExportModal } from './components/Export/ExportModal';
 import { ScientificInfoModal } from './components/Info/ScientificInfoModal';
+import { ModelObservationComparisonModal } from './components/Comparison/ModelObservationComparisonModal';
+import { DataPipelineModal } from './components/Pipeline/DataPipelineModal';
+import { VerticalDepthHUD } from './components/Controls/VerticalDepthHUD';
 
 export default function App() {
   const [state, setState] = useState<VisualizationState>({
@@ -32,10 +36,16 @@ export default function App() {
     edgeBlendMode: 'soft_feather',
     coastalFeathering: 0.90,
     boundaryFade: false,
+    showCurrents: false,
+    currentsOpacity: 0.85,
+    currentsStyle: 'both',
+    verticalExaggeration: 1,
   });
 
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
+  const [isPipelineOpen, setIsPipelineOpen] = useState(false);
 
   // Initialize ERDDAP live time coordinates on app launch
   useEffect(() => {
@@ -59,21 +69,37 @@ export default function App() {
     setState((prev) => {
       const next = { ...prev, ...updates };
 
-      // When shifting variable (e.g. to Chlorophyll or back to Temp/Sal),
+      // When shifting variable (e.g. to Chlorophyll, SSH, or back to Temp/Sal),
       // synchronize the timeline date to the corresponding dataset period!
       if (updates.variable && updates.variable !== prev.variable) {
         const syncedTimeIndex = syncTimeStepForVariable(prev.variable, updates.variable, prev.timeStepIndex);
         next.timeStepIndex = syncedTimeIndex;
 
         if (updates.variable === 'CHLA') {
-          next.depth = 5; // Chlorophyll is surface layer (0-5m)
+          next.depth = 0; // Chlorophyll is surface layer
           if (!updates.colormap) {
             next.colormap = 'incois_rainbow';
           }
-        } else if (prev.variable === 'CHLA') {
+        } else if (updates.variable === 'SSH') {
+          next.depth = 0; // Sea Surface Height is surface layer
+          if (!updates.colormap) {
+            next.colormap = 'balance';
+          }
+        } else {
+          // Switching to TEMP or SAL: ensure depth is valid for ARGO VAM (minimum 5m)
+          if (!next.depth || next.depth === 0) {
+            next.depth = 5;
+          }
           if (!updates.colormap) {
             next.colormap = updates.variable === 'TEMP' ? 'thermal' : 'halite';
           }
+        }
+      }
+
+      // If depth is explicitly set to 0 for subsurface variables, clamp to 5m
+      if (updates.depth !== undefined) {
+        if (!isSurfaceOnlyVariable(next.variable) && updates.depth === 0) {
+          next.depth = 5;
         }
       }
 
@@ -83,7 +109,7 @@ export default function App() {
         prev.selectedProbePoint &&
         !updates.selectedProbePoint
       ) {
-        const nextDepth = updates.depth !== undefined ? updates.depth : (next.variable === 'CHLA' ? 5 : prev.depth);
+        const nextDepth = updates.depth !== undefined ? updates.depth : (isSurfaceOnlyVariable(next.variable) ? 0 : prev.depth);
         const nextTime = next.timeStepIndex;
         const refreshedProbe = sampleOceanPoint(
           prev.selectedProbePoint.latitude,
@@ -131,6 +157,8 @@ export default function App() {
         state={state}
         onOpenExport={() => setIsExportOpen(true)}
         onOpenInfo={() => setIsInfoOpen(true)}
+        onOpenComparison={() => setIsComparisonOpen(true)}
+        onOpenPipeline={() => setIsPipelineOpen(true)}
         onToggleDebug={() => handleUpdateState({ debugMode: !state.debugMode })}
       />
 
@@ -142,6 +170,8 @@ export default function App() {
           onChangeState={handleUpdateState}
           activeFloatsCount={filteredFloats.length}
           totalFloatsCount={ARGO_FLOATS.length}
+          onOpenComparisonModal={() => setIsComparisonOpen(true)}
+          onOpenPipelineModal={() => setIsPipelineOpen(true)}
         />
 
         {/* Center 3D Globe Viewer (Unobstructed View) */}
@@ -152,6 +182,17 @@ export default function App() {
             onSelectProbePoint={(probe) => handleUpdateState({ selectedProbePoint: probe, selectedFloatId: null })}
             filteredFloats={filteredFloats}
           />
+
+          {/* Vertical Depth Exploration Sounder HUD (interactive sounder on globe viewport) */}
+          <div className="absolute right-4 bottom-14 z-20 pointer-events-auto">
+            <VerticalDepthHUD
+              depth={state.depth}
+              variable={state.variable}
+              onChangeDepth={(d: DepthLevel) => handleUpdateState({ depth: d })}
+              verticalExaggeration={state.verticalExaggeration || 1}
+              onChangeVerticalExaggeration={(ex: number) => handleUpdateState({ verticalExaggeration: ex })}
+            />
+          </div>
         </div>
 
         {/* Right Side Observation & Depth Profile Analysis Panel */}
@@ -170,6 +211,7 @@ export default function App() {
               colormap: v === 'TEMP' ? 'thermal' : v === 'SAL' ? 'halite' : 'incois_rainbow',
             })
           }
+          onOpenComparisonModal={() => setIsComparisonOpen(true)}
         />
       </div>
 
@@ -181,7 +223,7 @@ export default function App() {
         onChangeSpeed={(spd) => handleUpdateState({ playbackSpeed: spd })}
       />
 
-      {/* 4. MODALS (EXPORT & METHODOLOGY) */}
+      {/* 4. MODALS (EXPORT, METHODOLOGY, COMPARISON & PIPELINE) */}
       {isExportOpen && (
         <ExportModal
           state={state}
@@ -192,6 +234,27 @@ export default function App() {
       {isInfoOpen && (
         <ScientificInfoModal
           onClose={() => setIsInfoOpen(false)}
+        />
+      )}
+
+      {isComparisonOpen && (
+        <ModelObservationComparisonModal
+          isOpen={isComparisonOpen}
+          onClose={() => setIsComparisonOpen(false)}
+          selectedFloatId={state.selectedFloatId}
+          state={state}
+          onChangeDepth={(d: DepthLevel) => handleUpdateState({ depth: d })}
+          onChangeVariable={(v: OceanVariable) => handleUpdateState({ variable: v })}
+          onSelectFloat={(id: string) => handleUpdateState({ selectedFloatId: id })}
+        />
+      )}
+
+      {isPipelineOpen && (
+        <DataPipelineModal
+          isOpen={isPipelineOpen}
+          onClose={() => setIsPipelineOpen(false)}
+          state={state}
+          onChangeState={handleUpdateState}
         />
       )}
     </div>

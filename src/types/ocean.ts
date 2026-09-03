@@ -1,4 +1,4 @@
-export type OceanVariable = 'TEMP' | 'SAL' | 'CHLA';
+export type OceanVariable = 'TEMP' | 'SAL' | 'CHLA' | 'SSH';
 
 export interface DataSelection {
   datasetId: string;
@@ -52,7 +52,7 @@ export type DepthLevel =
   | 2000
   | number;
 
-export type ColormapType = 'incois_rainbow' | 'thermal' | 'halite';
+export type ColormapType = 'incois_rainbow' | 'thermal' | 'halite' | 'algae' | 'balance' | 'speed';
 
 export type BasemapType = 'satellite' | 'bathymetry';
 
@@ -134,6 +134,37 @@ export interface GridMetadata {
   lastUpdated: string;
 }
 
+export interface DatasetSpatialBounds {
+  datasetId: string;
+  variable: OceanVariable;
+  name: string;
+  sourceOrg: string;
+  latMin: number;
+  latMax: number;
+  latStep: number;
+  lonMin: number;
+  lonMax: number;
+  lonStep: number;
+  depths: DepthLevel[];
+  isSurfaceOnly: boolean;
+  unit: string;
+  lonConvention: '-180_to_180' | '0_to_360';
+  temporalRange: {
+    start: string;
+    end: string;
+  };
+}
+
+export interface RenderedRasterResult {
+  canvas: HTMLCanvasElement;
+  bounds: {
+    latMin: number;
+    latMax: number;
+    lonMin: number;
+    lonMax: number;
+  };
+}
+
 export interface PointProbeData {
   latitude: number;
   longitude: number;
@@ -146,12 +177,14 @@ export interface PointProbeData {
     temp: number;
     sal: number;
     chla: number;
+    ssh?: number;
   };
   profile: {
     depth: DepthLevel;
     temp: number;
     sal: number;
     chla: number;
+    ssh?: number;
   }[];
   nearestFloat?: {
     float: ArgoFloat;
@@ -228,4 +261,77 @@ export interface VisualizationState {
   coastalFeathering: number; // Fixed at 0.90 (90%)
   boundaryFade: boolean;     // Outer domain boundary fading
   debugMode?: boolean;       // Live Single Source of Truth Synchronization Audit
+  // Ocean Currents Layer Configuration
+  showCurrents?: boolean;
+  currentsStyle?: 'arrows' | 'particles' | 'both';
+  currentsOpacity?: number;
+  currentsSpeedScale?: number;
+  // 3D Vertical Exaggeration Scale (1x to 100x)
+  verticalExaggeration?: number;
+  // Large Dataset Performance: Subsetting Configuration
+  dataSubsetting?: SubsettingConfig;
+  subsetting?: SubsettingConfig;
+}
+
+export interface SubsettingConfig {
+  enabled: boolean;
+  spatialResolution: '0.25deg' | '0.50deg' | '1.00deg';
+  resolutionStep?: number;
+  latMin: number;
+  latMax: number;
+  lonMin: number;
+  lonMax: number;
+  activePreset?: 'FULL_INDIAN_OCEAN' | 'ARABIAN_SEA' | 'BAY_OF_BENGAL' | 'EQUATORIAL_ZONE' | 'CUSTOM';
+}
+
+export interface OceanCurrentVector {
+  lat: number;
+  lon: number;
+  u: number; // Eastward velocity (m/s)
+  v: number; // Northward velocity (m/s)
+  speed: number; // Magnitude (m/s)
+  speedKnots: number; // Magnitude (knots)
+  directionDeg: number; // Flow direction (0 = North, 90 = East)
+  depth: number;
+  name?: string;
+}
+
+export interface ModelObservationComparison {
+  floatId: string;
+  wmoId: string;
+  platformNumber: string;
+  latitude: number;
+  longitude: number;
+  basin: string;
+  sensorType: string;
+  cycleNumber: number;
+  dateStr: string;
+  depth: number;
+  variable: OceanVariable;
+  unit: string;
+  // Primary side-by-side values at selected depth
+  modelValue: number;
+  observedValue: number;
+  difference: number; // Observed - Model (Bias)
+  percentError: number; // |Observed - Model| / (|Model| + 1e-6) * 100
+  relativeAgreement: 'EXCELLENT' | 'GOOD' | 'MODERATE' | 'SIGNIFICANT_BIAS';
+  // Water column comprehensive statistics (across 5m to 2000m)
+  waterColumnStats: {
+    meanAbsoluteError: number;
+    rootMeanSquareError: number;
+    meanBiasError: number;
+    correlationCoefficient: number;
+    sampleCount: number;
+    maxDiscrepancyDepth: number;
+    maxDiscrepancyVal: number;
+  };
+  // Full vertical profile comparison rows
+  profileRows: Array<{
+    depth: number;
+    modelVal: number;
+    obsVal: number;
+    delta: number;
+    percentDelta: number;
+    qcFlag: number;
+  }>;
 }
