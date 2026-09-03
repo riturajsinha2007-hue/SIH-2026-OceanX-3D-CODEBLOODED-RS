@@ -912,6 +912,7 @@ export const OceanGlobe: React.FC<OceanGlobeProps> = ({
         const layer = viewer.imageryLayers.addImageryProvider(provider);
         layer.alpha = state.opacity;
         oceanLayerRef.current = layer;
+        viewer.scene.requestRender();
       } catch (err) {
         console.error('Failed to update ocean raster layer:', err);
       }

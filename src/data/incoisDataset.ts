@@ -110,6 +110,21 @@ export function getDatasetSpatialBounds(
     typeof activeSlice.lonMin === 'number' &&
     typeof activeSlice.lonMax === 'number'
   ) {
+    if (variable === 'CHLA') {
+      const meta = DATASET_SPATIAL_METADATA.CHLA;
+      const sLatMin = Math.max(meta.latMin, activeSlice.latMin);
+      const sLatMax = Math.min(meta.latMax, activeSlice.latMax);
+      const sLonMin = Math.max(meta.lonMin, activeSlice.lonMin);
+      const sLonMax = Math.min(meta.lonMax, activeSlice.lonMax);
+      return {
+        latMin: sLatMin,
+        latMax: sLatMax,
+        lonMin: normalizeLongitude(sLonMin),
+        lonMax: normalizeLongitude(sLonMax),
+        latStep: activeSlice.latStep || 0.5,
+        lonStep: activeSlice.lonStep || 0.5,
+      };
+    }
     return {
       latMin: activeSlice.latMin,
       latMax: activeSlice.latMax,
@@ -565,22 +580,37 @@ export function computePhysicalReferenceModel(
     return NaN;
   }
 
-  const argoSteps = dynamicArgoVamSteps;
-  const safeArgoIdx = Math.max(0, Math.min(argoSteps.length - 1, timeStepIndex));
-  const argoDateStr = argoSteps[safeArgoIdx]?.dateStr || '2024-03-15';
-  const argoParts = argoDateStr.split('-');
-  const argoYear = parseInt(argoParts[0] || '2024', 10);
-  const argoMonth = parseInt(argoParts[1] || '3', 10);
+  let targetYear = 2024;
+  let targetMonth = 3;
+  let targetDay = 15;
 
-  const monthPhase = (argoMonth - 0.5) / 12.0;
+  if (variable === 'CHLA') {
+    const chlSteps = dynamicOceansat2Steps;
+    const safeChlIdx = Math.max(0, Math.min(chlSteps.length - 1, timeStepIndex));
+    const chlDateStr = chlSteps[safeChlIdx]?.dateStr || '2013-03-15';
+    const chlParts = chlDateStr.split('-');
+    targetYear = parseInt(chlParts[0] || '2013', 10);
+    targetMonth = parseInt(chlParts[1] || '3', 10);
+    targetDay = parseInt(chlParts[2] || '15', 10);
+  } else {
+    const argoSteps = dynamicArgoVamSteps;
+    const safeArgoIdx = Math.max(0, Math.min(argoSteps.length - 1, timeStepIndex));
+    const argoDateStr = argoSteps[safeArgoIdx]?.dateStr || '2024-03-15';
+    const argoParts = argoDateStr.split('-');
+    targetYear = parseInt(argoParts[0] || '2024', 10);
+    targetMonth = parseInt(argoParts[1] || '3', 10);
+    targetDay = parseInt(argoParts[2] || '15', 10);
+  }
+
+  const monthPhase = (targetMonth - 0.5) / 12.0;
   const seasonWarming = Math.sin(monthPhase * 2 * Math.PI - 0.8) * 1.6;
-  const monsoonUpwelling = argoMonth >= 6 && argoMonth <= 9 ? Math.sin(((argoMonth - 6) / 3.0) * Math.PI) : 0;
-  let climateTrend = (argoYear - 2004) * 0.018;
-  if (argoYear === 2023 || argoYear === 2024) climateTrend += 0.45;
-  if (argoYear === 2015 || argoYear === 2016) climateTrend += 0.35;
+  const monsoonUpwelling = targetMonth >= 6 && targetMonth <= 9 ? Math.sin(((targetMonth - 6) / 3.0) * Math.PI) : 0;
+  let climateTrend = (targetYear - 2004) * 0.018;
+  if (targetYear === 2023 || targetYear === 2024) climateTrend += 0.45;
+  if (targetYear === 2015 || targetYear === 2016) climateTrend += 0.35;
 
-  const turbulence = (fbm(lon * 0.12 + argoMonth * 0.1, lat * 0.12, 3) - 0.5) * 0.9;
-  const eddyFilament = Math.sin(lon * 0.35 + lat * 0.28 + argoMonth * 0.5) * 0.3;
+  const turbulence = (fbm(lon * 0.12 + targetMonth * 0.1, lat * 0.12, 3) - 0.5) * 0.9;
+  const eddyFilament = Math.sin(lon * 0.35 + lat * 0.28 + targetMonth * 0.5) * 0.3;
 
   if (variable === 'TEMP') {
     const eqDist = Math.abs(lat - 3.5);
@@ -662,14 +692,14 @@ export function computePhysicalReferenceModel(
     if (lat < -15.0) {
       circumpolar = -Math.min(0.28, Math.pow(Math.abs(lat + 15.0) / 18.0, 1.4) * 0.28);
     }
-    const planetaryWave = Math.sin(lon * 0.18 - argoMonth * 0.5) * Math.exp(-Math.pow(lat / 6.0, 2)) * 0.12;
-    const mesoscaleSla = (smoothNoise(lon * 0.25, lat * 0.25 + argoMonth * 0.15) - 0.5) * 0.16;
+    const planetaryWave = Math.sin(lon * 0.18 - targetMonth * 0.5) * Math.exp(-Math.pow(lat / 6.0, 2)) * 0.12;
+    const mesoscaleSla = (smoothNoise(lon * 0.25, lat * 0.25 + targetMonth * 0.15) - 0.5) * 0.16;
 
     let sla = subtropHigh + circumpolar + planetaryWave + mesoscaleSla;
-    sla += Math.exp(-dGreatWhirl * dGreatWhirl) * (argoMonth >= 6 && argoMonth <= 9 ? 0.24 : 0.08);
+    sla += Math.exp(-dGreatWhirl * dGreatWhirl) * (targetMonth >= 6 && targetMonth <= 9 ? 0.24 : 0.08);
     sla -= Math.exp(-dSocotra * dSocotra) * 0.16;
-    sla -= Math.exp(-dSriLanka * dSriLanka) * (argoMonth >= 5 && argoMonth <= 9 ? 0.22 : 0.04);
-    sla += Math.exp(-dLaccadive * dLaccadive) * (argoMonth <= 3 || argoMonth >= 11 ? 0.16 : -0.12);
+    sla -= Math.exp(-dSriLanka * dSriLanka) * (targetMonth >= 5 && targetMonth <= 9 ? 0.22 : 0.04);
+    sla += Math.exp(-dLaccadive * dLaccadive) * (targetMonth <= 3 || targetMonth >= 11 ? 0.16 : -0.12);
     sla += Math.sin(lon * 0.4 + lat * 0.3) * Math.exp(-dBoBEddy1 * dBoBEddy1) * 0.15;
 
     return Math.max(-0.40, Math.min(0.40, Number(sla.toFixed(3))));
@@ -684,7 +714,7 @@ export function computePhysicalReferenceModel(
     const dMalabar = Math.hypot((lon - 74.5) / 2.5, (lat - 11.5) / 4.5);
 
     // Summer monsoon upwelling & Winter NE monsoon bloom amplification
-    const upwellingFactor = (argoMonth >= 6 && argoMonth <= 9) ? 2.8 : (argoMonth === 1 || argoMonth === 2 || argoMonth === 12) ? 2.2 : 1.2;
+    const upwellingFactor = (targetMonth >= 6 && targetMonth <= 9) ? 2.8 : (targetMonth === 1 || targetMonth === 2 || targetMonth === 12) ? 2.2 : 1.2;
 
     chl += Math.exp(-dOman * dOman) * (1.8 * upwellingFactor);
     chl += Math.exp(-dSomali * dSomali) * (2.2 * upwellingFactor);
@@ -697,15 +727,11 @@ export function computePhysicalReferenceModel(
     chl += Math.exp(-dDelta * dDelta) * 3.2;
     chl += Math.exp(-dAndaman * dAndaman) * 0.75;
 
-    // 3. Subtropical Oligotrophic Gyre depletion (lat < -15°S)
-    if (lat < -10.0) {
-      const gyreAtten = Math.min(1.0, Math.pow(Math.abs(lat + 10.0) / 18.0, 1.2));
-      chl = chl * (1.0 - gyreAtten * 0.72);
-    }
-
-    // 4. Sub-mesoscale filaments & eddies
-    const chlNoise = (smoothNoise(lon * 0.35 + argoMonth * 0.2, lat * 0.35) - 0.4) * 0.25;
-    chl = Math.max(0.03, Math.min(8.0, chl + chlNoise));
+    // 3. Sub-mesoscale filaments & daily eddy turbulence
+    const dayPhase = (targetDay / 31.0) * Math.PI * 2;
+    const dailyMod = Math.sin(lon * 0.45 + lat * 0.35 + dayPhase) * 0.14;
+    const chlNoise = (smoothNoise(lon * 0.35 + targetMonth * 0.2, lat * 0.35 + dayPhase * 0.1) - 0.4) * 0.25;
+    chl = Math.max(0.03, Math.min(8.0, chl + dailyMod + chlNoise));
 
     // Depth attenuation (euphotic zone decay)
     if (depth <= 10) return chl;

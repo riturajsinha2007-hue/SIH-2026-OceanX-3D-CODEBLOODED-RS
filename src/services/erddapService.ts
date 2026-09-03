@@ -361,7 +361,14 @@ export async function fetchDynamicArgoVamDepthDimension(): Promise<DynamicDepthD
   };
 }
 
-import { computePhysicalReferenceModel } from '../data/incoisDataset';
+import {
+  computePhysicalReferenceModel,
+  getDynamicOceansat2TimeSteps,
+  getDynamicArgoVamTimeSteps,
+} from '../data/incoisDataset';
+
+// Client-side atomic grid slice cache for instantaneous timeline navigation
+const gridSliceCache = new Map<string, ErddapGridSliceResponse>();
 
 /**
  * Generates verified client-side INCOIS ARGO VAM grid slice (used on Vercel, offline, or fallback)
@@ -388,12 +395,17 @@ export function createSynthesizedArgoVamSlice(
   let sum = 0;
   let validPoints = 0;
 
+  const dateOnly = cleanTime.split('T')[0];
+  const argoSteps = getDynamicArgoVamTimeSteps();
+  let timeStepIndex = argoSteps.findIndex((s) => s.dateStr.startsWith(dateOnly.substring(0, 7)));
+  if (timeStepIndex === -1) timeStepIndex = 242;
+
   for (let j = 0; j < latCount; j++) {
-    const lat = latMax - j * latStep;
+    const lat = latMin + j * latStep;
     for (let i = 0; i < lonCount; i++) {
       const lon = lonMin + i * lonStep;
       const idx = j * lonCount + i;
-      const val = computePhysicalReferenceModel(lat, lon, variable, depth);
+      const val = computePhysicalReferenceModel(lat, lon, variable, depth, timeStepIndex);
       if (isNaN(val) || val === null) {
         values[idx] = null;
       } else {
@@ -436,19 +448,20 @@ export function createSynthesizedArgoVamSlice(
 
 /**
  * Generates verified client-side INCOIS Oceansat-2 Chlorophyll-a slice (used on Vercel, offline, or fallback)
+ * Strictly bound to the actual geographic domain of Oceansat-2 [0.5, 27.5]°N and [47.0, 99.0]°E
  */
 export function createSynthesizedOceansat2Slice(
   timeStr: string
 ): ErddapGridSliceResponse {
   const cleanTime = timeStr.includes('T') ? timeStr : `${timeStr}T00:00:00Z`;
-  const latMin = -35.0;
-  const latMax = 30.0;
+  const latMin = 0.5;
+  const latMax = 27.5;
   const latStep = 0.5;
-  const latCount = 131;
-  const lonMin = 30.0;
-  const lonMax = 120.0;
+  const latCount = 55;
+  const lonMin = 47.0;
+  const lonMax = 99.0;
   const lonStep = 0.5;
-  const lonCount = 181;
+  const lonCount = 105;
 
   const total = latCount * lonCount;
   const values: (number | null)[] = new Array(total);
@@ -457,12 +470,20 @@ export function createSynthesizedOceansat2Slice(
   let sum = 0;
   let validPoints = 0;
 
+  const dateOnly = cleanTime.split('T')[0];
+  const chlSteps = getDynamicOceansat2TimeSteps();
+  let timeStepIndex = chlSteps.findIndex((s) => s.dateStr === dateOnly);
+  if (timeStepIndex === -1) {
+    timeStepIndex = chlSteps.findIndex((s) => s.dateStr.startsWith(dateOnly.substring(0, 7)));
+  }
+  if (timeStepIndex === -1) timeStepIndex = 772; // default 2013-03-15
+
   for (let j = 0; j < latCount; j++) {
-    const lat = latMax - j * latStep;
+    const lat = latMin + j * latStep;
     for (let i = 0; i < lonCount; i++) {
       const lon = lonMin + i * lonStep;
       const idx = j * lonCount + i;
-      const val = computePhysicalReferenceModel(lat, lon, 'CHLA', 5);
+      const val = computePhysicalReferenceModel(lat, lon, 'CHLA', 0, timeStepIndex);
       if (isNaN(val) || val === null) {
         values[idx] = null;
       } else {
@@ -492,7 +513,7 @@ export function createSynthesizedOceansat2Slice(
     lonCount,
     values,
     stats: {
-      min: min === Infinity ? 0.02 : Number(min.toFixed(3)),
+      min: min === Infinity ? 0.03 : Number(min.toFixed(3)),
       max: max === -Infinity ? 5.0 : Number(max.toFixed(3)),
       mean: validPoints > 0 ? Number((sum / validPoints).toFixed(3)) : 0.25,
       validPoints,
@@ -514,12 +535,21 @@ export async function fetchArgoVamGridSlice(
   signal?: AbortSignal
 ): Promise<ErddapGridSliceResponse | null> {
   const cleanTime = timeStr.includes('T') ? timeStr : `${timeStr}T00:00:00Z`;
+  const dateOnly = cleanTime.split('T')[0];
+  const cacheKey = `${variable}:${dateOnly}:${depth}`;
+
+  if (gridSliceCache.has(cacheKey)) {
+    return gridSliceCache.get(cacheKey)!;
+  }
+
   try {
     const url = `/api/erddap/argo_vam/grid?variable=${variable}&time=${encodeURIComponent(cleanTime)}&depth=${depth}`;
     const res = await fetch(url, { signal });
-    if (res.ok) {
+    const contentType = res.headers.get('content-type') || '';
+    if (res.ok && contentType.includes('application/json')) {
       const data = await res.json();
       if (data.success && Array.isArray(data.values) && data.values.length > 0) {
+        gridSliceCache.set(cacheKey, data as ErddapGridSliceResponse);
         return data as ErddapGridSliceResponse;
       }
     }
@@ -531,7 +561,9 @@ export async function fetchArgoVamGridSlice(
   }
 
   // Client-side verified scientific fallback
-  return createSynthesizedArgoVamSlice(variable, cleanTime, depth);
+  const fallbackSlice = createSynthesizedArgoVamSlice(variable, cleanTime, depth);
+  gridSliceCache.set(cacheKey, fallbackSlice);
+  return fallbackSlice;
 }
 
 /**
@@ -543,12 +575,21 @@ export async function fetchOceansat2GridSlice(
   signal?: AbortSignal
 ): Promise<ErddapGridSliceResponse | null> {
   const cleanTime = timeStr.includes('T') ? timeStr : `${timeStr}T00:00:00Z`;
+  const dateOnly = cleanTime.split('T')[0];
+  const cacheKey = `CHLA:${dateOnly}`;
+
+  if (gridSliceCache.has(cacheKey)) {
+    return gridSliceCache.get(cacheKey)!;
+  }
+
   try {
     const url = `/api/erddap/oceansat2/grid?time=${encodeURIComponent(cleanTime)}`;
     const res = await fetch(url, { signal });
-    if (res.ok) {
+    const contentType = res.headers.get('content-type') || '';
+    if (res.ok && contentType.includes('application/json')) {
       const data = await res.json();
       if (data.success && Array.isArray(data.values) && data.values.length > 0) {
+        gridSliceCache.set(cacheKey, data as ErddapGridSliceResponse);
         return data as ErddapGridSliceResponse;
       }
     }
@@ -560,7 +601,9 @@ export async function fetchOceansat2GridSlice(
   }
 
   // Client-side verified scientific fallback
-  return createSynthesizedOceansat2Slice(cleanTime);
+  const fallbackSlice = createSynthesizedOceansat2Slice(cleanTime);
+  gridSliceCache.set(cacheKey, fallbackSlice);
+  return fallbackSlice;
 }
 
 /**
@@ -586,12 +629,17 @@ export function createSynthesizedSshSlice(
   let sum = 0;
   let validPoints = 0;
 
+  const dateOnly = cleanTime.split('T')[0];
+  const argoSteps = getDynamicArgoVamTimeSteps();
+  let timeStepIndex = argoSteps.findIndex((s) => s.dateStr.startsWith(dateOnly.substring(0, 7)));
+  if (timeStepIndex === -1) timeStepIndex = 242;
+
   for (let j = 0; j < latCount; j++) {
-    const lat = latMax - j * latStep;
+    const lat = latMin + j * latStep;
     for (let i = 0; i < lonCount; i++) {
       const lon = lonMin + i * lonStep;
       const idx = j * lonCount + i;
-      const val = computePhysicalReferenceModel(lat, lon, 'SSH', 5);
+      const val = computePhysicalReferenceModel(lat, lon, 'SSH', 5, timeStepIndex);
       if (isNaN(val) || val === null) {
         values[idx] = null;
       } else {
@@ -640,12 +688,21 @@ export async function fetchSshGridSlice(
   signal?: AbortSignal
 ): Promise<ErddapGridSliceResponse | null> {
   const cleanTime = timeStr.includes('T') ? timeStr : `${timeStr}T00:00:00Z`;
+  const dateOnly = cleanTime.split('T')[0];
+  const cacheKey = `SSH:${dateOnly}`;
+
+  if (gridSliceCache.has(cacheKey)) {
+    return gridSliceCache.get(cacheKey)!;
+  }
+
   try {
     const url = `/api/erddap/ssh/grid?time=${encodeURIComponent(cleanTime)}`;
     const res = await fetch(url, { signal });
-    if (res.ok) {
+    const contentType = res.headers.get('content-type') || '';
+    if (res.ok && contentType.includes('application/json')) {
       const data = await res.json();
       if (data.success && Array.isArray(data.values) && data.values.length > 0) {
+        gridSliceCache.set(cacheKey, data as ErddapGridSliceResponse);
         return data as ErddapGridSliceResponse;
       }
     }
@@ -656,7 +713,9 @@ export async function fetchSshGridSlice(
     console.info(`[ERDDAP] Local fallback active for Altimetry SSH at ${cleanTime}`);
   }
 
-  return createSynthesizedSshSlice(cleanTime);
+  const fallbackSlice = createSynthesizedSshSlice(cleanTime);
+  gridSliceCache.set(cacheKey, fallbackSlice);
+  return fallbackSlice;
 }
 
 /**
